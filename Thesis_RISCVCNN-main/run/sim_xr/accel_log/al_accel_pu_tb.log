@@ -1,0 +1,39 @@
+TOOL:	xrun(64)	24.09-s005: Started on Sep 02, 2025 at 17:21:41 +07
+xrun(64): 24.09-s005: (c) Copyright 1995-2025 Cadence Design Systems, Inc.
+Recompiling... reason: file '/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/al_accel/al_accel_pu.v' is newer than expected.
+	expected: Mon Sep  1 23:45:34 2025
+	actual:   Tue Sep  2 17:17:31 2025
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+xmvlog: Memory Usage - Final: 50.2M, Peak: 50.2M, Peak virtual: 77.5M
+xmvlog: CPU Usage - 0.1s system + 0.3s user = 0.4s total (0.4s, 100.0% cpu)
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d:  Time - 0.4s
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+file: ../../Source/al_accel/al_accel_pu_array.v
+	Total errors/warnings found outside modules and primitives:
+		errors: 0, warnings: 2
+xmvlog: Memory Usage - Final: 24.1M, Peak: 24.1M, Peak virtual: 53.7M
+xmvlog: CPU Usage - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+xmelab: *W,CONFILL: Missing -CONFFILE option.
+		Caching library 'worklib' ....... Done
+	Elaborating the design hierarchy (incremental partition):
+xmelab: *N,MEVCON: In single xrun -nopreelab flow or in multi-run MSIE mode, explicit connectivity access from command-line would be required for tran gate pins, if '$dumpports' is used in the design.
+		Caching library 'worklib' ....... Done
+	Top level design units:
+		al_accel
+		al_accel_ireg
+		al_accel_lpureg
+		al_accel_lut
+		al_accel_mac
+		al_accel_wreg
+		al_accel_pu_tb
+        $dumpvars(0, tb_al_accel_pu);
+                                  |
+xmelab: *E,CUVUNF (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_pu_tb.v,119|34): Hierarchical name component lookup failed for 'tb_al_accel_pu' at 'al_accel_pu_tb'.
+xmelab: Memory Usage - Final: 49.7M, Peak: 49.7M, Peak virtual: 143.0M
+xmelab: CPU Usage - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu) (VirtMach)
+xrun: *E,ELBERR: Error (*E) or soft error (*SE) occurred during elaboration (status 1), exiting.
+TOOL:	xrun(64)	24.09-s005: Exiting on Sep 02, 2025 at 17:21:42 +07  (total: 00:00:01)
+xrun: Time - 0.6s

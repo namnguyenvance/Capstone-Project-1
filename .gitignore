@@ -1,0 +1,9 @@
+**/venv/
+venv/
+**/__pycache__/
+*.pyc
+*.vvp
+*.elf
+*.hex
+*.o
+.DS_Store

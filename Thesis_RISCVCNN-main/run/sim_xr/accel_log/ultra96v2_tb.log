@@ -1,0 +1,143 @@
+TOOL:	xrun(64)	24.09-s005: Started on Oct 02, 2025 at 22:28:08 +07
+xrun(64): 24.09-s005: (c) Copyright 1995-2025 Cadence Design Systems, Inc.
+Recompiling... reason: file '/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v' is newer than expected.
+	expected: Thu Oct  2 20:23:25 2025
+	actual:   Thu Oct  2 22:27:24 2025
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+xmvlog: Memory Usage - Final: 50.3M, Peak: 50.3M, Peak virtual: 77.6M
+xmvlog: CPU Usage - 0.1s system + 0.3s user = 0.4s total (0.4s, 100.0% cpu)
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d:  Time - 0.4s
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+file: ../../Testbench/soc_tb/ultra96v2_tb.v
+			uut.soc.imem.memory[i][ 7: 0] = tmp_mem[BASE + 4*i];
+			                                             |
+xmvlog: *W,BIGWIX (../../Testbench/soc_tb/ultra96v2_tb.v,86|48): Memory index truncation.
+			uut.soc.imem.memory[i][15: 8] = tmp_mem[BASE + 4*i + 1];
+			                                                   |
+xmvlog: *W,BIGWIX (../../Testbench/soc_tb/ultra96v2_tb.v,87|54): Memory index truncation.
+			uut.soc.imem.memory[i][23:16] = tmp_mem[BASE + 4*i + 2];
+			                                                   |
+xmvlog: *W,BIGWIX (../../Testbench/soc_tb/ultra96v2_tb.v,88|54): Memory index truncation.
+			uut.soc.imem.memory[i][31:24] = tmp_mem[BASE + 4*i + 3];
+			                                                   |
+xmvlog: *W,BIGWIX (../../Testbench/soc_tb/ultra96v2_tb.v,89|54): Memory index truncation.
+	module worklib.ultra96v2_wrapper:v
+		errors: 0, warnings: 4
+	Total errors/warnings found outside modules and primitives:
+		errors: 0, warnings: 2
+xmvlog: Memory Usage - Final: 24.0M, Peak: 24.0M, Peak virtual: 55.1M
+xmvlog: CPU Usage - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+xmelab: *W,CONFILL: Missing -CONFFILE option.
+		Caching library 'worklib' ....... Done
+	Elaborating the design hierarchy (incremental partition):
+xmelab: *N,MEVCON: In single xrun -nopreelab flow or in multi-run MSIE mode, explicit connectivity access from command-line would be required for tran gate pins, if '$dumpports' is used in the design.
+		Caching library 'worklib' ....... Done
+	) cpu (
+	    |
+xmelab: *W,CUVWSP (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picosoc.v,152|5): 13 output ports were not connected:
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,92): trap
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,104): mem_la_read
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,105): mem_la_write
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,106): mem_la_addr
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,107): mem_la_wdata
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,108): mem_la_wstrb
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,111): pcpi_valid
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,112): pcpi_insn
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,113): pcpi_rs1
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,114): pcpi_rs2
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,122): eoi
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,159): trace_valid
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,160): trace_data
+
+	) cpu (
+	    |
+xmelab: *W,CUVWSI (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picosoc.v,152|5): 4 input ports were not connected:
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,115): pcpi_wr
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,116): pcpi_rd
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,117): pcpi_wait
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/picorv32.v,118): pcpi_ready
+
+	Top level design units:
+		ultra96v2_wrapper
+			uut.soc.imem.memory[i][ 7: 0] = tmp_mem[BASE + 4*i];
+			                    |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,86|23): Memory index truncation.
+			uut.soc.imem.memory[i][ 7: 0] = tmp_mem[BASE + 4*i];
+			                                             |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,86|48): Memory index truncation.
+			uut.soc.imem.memory[i][15: 8] = tmp_mem[BASE + 4*i + 1];
+			                    |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,87|23): Memory index truncation.
+			uut.soc.imem.memory[i][15: 8] = tmp_mem[BASE + 4*i + 1];
+			                                                   |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,87|54): Memory index truncation.
+			uut.soc.imem.memory[i][23:16] = tmp_mem[BASE + 4*i + 2];
+			                    |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,88|23): Memory index truncation.
+			uut.soc.imem.memory[i][23:16] = tmp_mem[BASE + 4*i + 2];
+			                                                   |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,88|54): Memory index truncation.
+			uut.soc.imem.memory[i][31:24] = tmp_mem[BASE + 4*i + 3];
+			                    |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,89|23): Memory index truncation.
+			uut.soc.imem.memory[i][31:24] = tmp_mem[BASE + 4*i + 3];
+			                                                   |
+xmelab: *W,BIGWIX (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v,89|54): Memory index truncation.
+	Building instance overlay tables: .................... Done
+	Generating native compiled code:
+		worklib.ultra96v2_wrapper:v <0x0ebb2c9b>
+			streams:  11, words: 11774
+xmvlog_cg: Memory Usage - Final: 22.3M, Peak: 22.3M, Peak virtual: 37.9M
+xmvlog_cg: CPU Usage - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+	Building instance specific data structures.
+	Loading native compiled code:     .................... Done
+	Generating Debug Data:
+		LWD Database path: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/run/sim_xr/xcelium.d/worklib/ultra96v2_wrapper/v/debug_db/ultra96v2_wrapper)
+		Power Aware Instances:                    0
+		Liberty Instances:                        0
+		Out Of Module References:                 4
+		Assertions:                               0
+		Liberty Information:
+			PG Pins:	                  0
+			Liberty Pins:	                  0
+	Design hierarchy summary:
+		                 Instances  Unique
+		Modules:                10      10
+		Registers:             240     240
+		Scalar wires:           57       -
+		Vectored wires:         42       -
+		Named events:            1       1
+		Always blocks:          37      38
+		Initial blocks:          5       5
+		Cont. assignments:      46      68
+		Pseudo assignments:     16       -
+		Sparse arrays:           2       -
+		Process Clocks:         19       1
+		Simulation timescale:  1ps
+	Writing incremental snapshot: worklib.ultra96v2_wrapper:v
+xmelab: Memory Usage - Final: 62.3M, Peak: 66.4M, Peak virtual: 282.0M
+xmelab: CPU Usage - 0.1s system + 0.1s user = 0.2s total (0.2s, 100.0% cpu) (VirtMach)
+xmelab: xmvlog_cg Time - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+Loading snapshot worklib.ultra96v2_wrapper:v .................... Done
+xcelium> source /tools/cx/XCELIUM2409/tools/xcelium/files/xmsimrc
+xcelium> source /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d/additions/sv/files/tcl/uvm_sim.tcl
+xcelium> run
+
+==========================================
+    STARTING HW without CNN ACCEL TEST    
+==========================================
+Architecture: 2 Conv + 2 Pool + 2 Dense 
+Test Case 0:  dc f6 dd f2 03 d9 c9 53 e4 f2 - predicted = 7; expected = 7; result = true
+Test Case 1:  0a 07 4f d8 cc c5 03 c3 f3 d5 - predicted = 2; expected = 2; result = true
+
+Total:       10000 x 50 000 Clock Cycles
+Simulation complete via $finish(1) at time 5 S + 0
+/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/soc_tb/ultra96v2_tb.v:41 		$finish;
+xcelium> exit
+xmsim: Memory Usage - Final: 70.3M, Peak: 70.3M, Peak virtual: 334.0M
+xmsim: CPU Usage - 0.2s system + 408.8s user = 408.9s total (408.4s, 100.0% cpu) (VirtMach)
+xrun: Time - 409.2s
+TOOL:	xrun(64)	24.09-s005: Exiting on Oct 02, 2025 at 22:34:57 +07  (total: 00:06:49)

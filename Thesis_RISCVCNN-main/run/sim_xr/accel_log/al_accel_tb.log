@@ -1,0 +1,122 @@
+TOOL:	xrun(64)	24.09-s005: Started on Sep 22, 2025 at 21:44:42 +07
+xrun(64): 24.09-s005: (c) Copyright 1995-2025 Cadence Design Systems, Inc.
+Recompiling... reason: file '/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_tb.v' is newer than expected.
+	expected: Mon Sep 22 21:06:36 2025
+	actual:   Mon Sep 22 21:44:39 2025
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+xmvlog: Memory Usage - Final: 50.1M, Peak: 50.1M, Peak virtual: 77.5M
+xmvlog: CPU Usage - 0.2s system + 0.4s user = 0.6s total (0.7s, 87.7% cpu)
+Compiling UVM packages (uvm_pkg.sv cdns_uvm_pkg.sv) using uvmhome location /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d:  Time - 0.7s
+xmvlog: *W,NOTIND: unable to access -INCDIR Source (No such file or directory).
+xmvlog: *W,NOTIND: unable to access -INCDIR Source/al_accel (No such file or directory).
+file: ../../Testbench/al_accel_tb.v
+	module worklib.al_accel_tb:v
+		errors: 0, warnings: 0
+	module worklib.al_accel_mem:v
+		errors: 0, warnings: 0
+	Total errors/warnings found outside modules and primitives:
+		errors: 0, warnings: 2
+xmvlog: Memory Usage - Final: 24.8M, Peak: 24.8M, Peak virtual: 55.4M
+xmvlog: CPU Usage - 0.0s system + 0.1s user = 0.1s total (0.1s, 84.7% cpu)
+xmelab: *W,CONFILL: Missing -CONFFILE option.
+		Caching library 'worklib' ....... Done
+	Elaborating the design hierarchy (incremental partition):
+xmelab: *N,MEVCON: In single xrun -nopreelab flow or in multi-run MSIE mode, explicit connectivity access from command-line would be required for tran gate pins, if '$dumpports' is used in the design.
+    al_accel uut (
+               |
+xmelab: *W,CUVWSP (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_tb.v,8191|15): 1 output port was not connected:
+xmelab: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Source/al_accel/al_accel.v,24): al_accel_cal_fin
+
+	Top level design units:
+		al_accel_lpureg
+		al_accel_lut
+		al_accel_mac
+		al_accel_tb
+        .raddr  (al_accel_raddr[31:2]),
+                              |
+xmelab: *W,CUVMPW (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_tb.v,8216|30): port sizes differ in port connection(30/18) for the instance(al_accel_tb) .
+        .waddr  (al_accel_waddr[31:2]),
+                              |
+xmelab: *W,CUVMPW (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_tb.v,8221|30): port sizes differ in port connection(30/18) for the instance(al_accel_tb) .
+	Building instance overlay tables: .................... Done
+	Generating native compiled code:
+		worklib.al_accel_tb:v <0x1d75bbf2>
+			streams:  16, words: 41938
+		worklib.al_accel_mem:v <0x287f431f>
+			streams:   6, words:  4095
+xmvlog_cg: Memory Usage - Final: 22.7M, Peak: 22.7M, Peak virtual: 38.1M
+xmvlog_cg: CPU Usage - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+	Building instance specific data structures.
+	Loading native compiled code:     .................... Done
+	Generating Debug Data:
+		LWD Database path: (/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/run/sim_xr/xcelium.d/worklib/al_accel_lpureg/v/debug_db/al_accel_lpureg)
+		Power Aware Instances:                    0
+		Liberty Instances:                        0
+		Out Of Module References:                14
+		Assertions:                               0
+		Liberty Information:
+			PG Pins:	                  0
+			Liberty Pins:	                  0
+	Design hierarchy summary:
+		                 Instances  Unique
+		Modules:               219      33
+		Registers:             527     261
+		Scalar wires:          527       -
+		Expanded wires:        728      50
+		Vectored wires:        753       -
+		Always blocks:         168      54
+		Initial blocks:          5       5
+		Cont. assignments:     397     190
+		Pseudo assignments:    106       -
+		Process Clocks:        117       5
+		Simulation timescale:  1ps
+	Writing incremental snapshot: worklib.al_accel_lpureg:v
+xmelab: Memory Usage - Final: 65.2M, Peak: 70.2M, Peak virtual: 283.5M
+xmelab: CPU Usage - 0.2s system + 0.2s user = 0.3s total (0.5s, 70.0% cpu) (VirtMach)
+xmelab: xmvlog_cg Time - 0.0s system + 0.0s user = 0.0s total (0.0s, 100.0% cpu)
+Loading snapshot worklib.al_accel_lpureg:v .................... Done
+xcelium> source /tools/cx/XCELIUM2409/tools/xcelium/files/xmsimrc
+xcelium> source /tools/cx/XCELIUM2409/tools/methodology/UVM/CDNS-1.1d/additions/sv/files/tcl/uvm_sim.tcl
+xcelium> run
+xmsim: *W,PRUASZ: Unpacked array at "al_accel_tb.ram.mem" of 32768 elements exceeds limit of 16384 - not probed
+ Use 'probe -create -unpacked 32768 al_accel_tb.ram.mem' or 'setenv SHM_UNPACKED_LIMIT 32768' to adjust limit.
+HARDWARE RESULT
+Channel 0:
+  -3    5  -15 
+  -8    1  -11 
+ -10   -4   -1 
+*************
+Channel 1:
+  54   79   43 
+  51   69   49 
+  47   61   64 
+*************
+Channel 2:
+  15   19   -7 
+  12   11    3 
+   0   10   17 
+*************
+Channel 3:
+  51   38   22 
+  34   29   24 
+  30   32   37 
+*************
+Channel 4:
+ -40  -45  -53 
+ -47  -50  -52 
+ -50  -49  -46 
+*************
+Channel 5:
+   4    5  -13 
+  -6   -6   -7 
+  -7   -5   -1 
+*************
+Simulation complete via $finish(1) at time 1 MS + 0
+/home/manhtr/Desktop/RISCV_CNN/RISC_CNN_DSP/New_RISCV_CNN/Testbench/al_accel_tb.v:8274 		$finish;
+xcelium> exit
+xmsim: Memory Usage - Final: 57.3M, Peak: 57.3M, Peak virtual: 219.6M
+xmsim: CPU Usage - 0.0s system + 0.2s user = 0.2s total (0.1s, 100.0% cpu) (VirtMach)
+xrun: Time - 1.7s
+TOOL:	xrun(64)	24.09-s005: Exiting on Sep 22, 2025 at 21:44:43 +07  (total: 00:00:01)

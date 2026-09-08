@@ -1,0 +1,3 @@
+out_log/*
+testbench/accelerator_tb/*.vvp
+dummy/*

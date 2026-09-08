@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "dumb_func.h": "c",
+        "ultra96v2_fw_hex_data.h": "c",
+        "al_ultra96v2_fw_hex_data.h": "c",
+        "pico_std.h": "c",
+        "dl_ops.h": "c",
+        "mnist_input_data.h": "c",
+        "mnist_model_data.h": "c",
+        "cnnnew_alpico_model_data.h": "c",
+        "cnnnew_pico_model_data.h": "c"
+    }
+}
