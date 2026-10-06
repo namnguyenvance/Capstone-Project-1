@@ -34,6 +34,8 @@ module my_soc (
     wire quant_accel_sel = mem_valid && (mem_addr[31:8] == 24'h020002);
     // NEW: Depthwise Convolution Accelerator (Address range: 0x02000300 - 0x020003FF)
     wire dw_conv_accel_sel = mem_valid && (mem_addr[31:8] == 24'h020003);
+    // NEW: Pointwise (1x1) Convolution Accelerator (Address range: 0x02000400 - 0x020007FF)
+    wire pw_conv_accel_sel = mem_valid && (mem_addr[31:10] == 22'h008001);
 
     // RAM read/write logic
     reg [31:0] ram_rdata;
@@ -191,8 +193,33 @@ module my_soc (
         .rdata(dw_conv_accel_rdata)
     );
 
+    // ==========================================
+    // NEW: Pointwise Convolution Accelerator
+    // ==========================================
+    wire [31:0] pw_conv_accel_rdata;
+    wire pw_conv_accel_write_en = pw_conv_accel_sel && (mem_wstrb != 4'b0000) && !mem_ready;
+    reg pw_conv_accel_ready;
+
+    always @(posedge clk) begin
+        if (!resetn) begin
+            pw_conv_accel_ready <= 1'b0;
+        end else begin
+            pw_conv_accel_ready <= pw_conv_accel_sel && !mem_ready;
+        end
+    end
+
+    // Instantiate Pointwise Convolution Accelerator
+    my_pw_conv_accel pw_conv_accel (
+        .clk(clk),
+        .resetn(resetn),
+        .addr(mem_addr[9:2]),
+        .write_en(pw_conv_accel_write_en),
+        .wdata(mem_wdata),
+        .rdata(pw_conv_accel_rdata)
+    );
+
     // Bus response mux (extended with DW conv accel)
-    assign mem_ready = ram_ready || led_ready || uart_div_sel || (uart_dat_sel && !reg_dat_wait) || accel_ready || conv_accel_ready || quant_accel_ready || dw_conv_accel_ready;
+    assign mem_ready = ram_ready || led_ready || uart_div_sel || (uart_dat_sel && !reg_dat_wait) || accel_ready || conv_accel_ready || quant_accel_ready || dw_conv_accel_ready || pw_conv_accel_ready;
     assign mem_rdata = ram_ready            ? ram_rdata   : 
                        uart_div_sel         ? uart_div_do : 
                        uart_dat_sel         ? uart_dat_do : 
@@ -200,6 +227,7 @@ module my_soc (
                        conv_accel_ready     ? conv_accel_rdata :
                        quant_accel_ready    ? quant_accel_rdata :
                        dw_conv_accel_ready  ? dw_conv_accel_rdata :
+                       pw_conv_accel_ready  ? pw_conv_accel_rdata :
                        32'h00000000;
 
     // Instantiate CPU Core

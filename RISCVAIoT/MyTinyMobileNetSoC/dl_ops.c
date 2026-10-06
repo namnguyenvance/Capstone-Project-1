@@ -26,6 +26,14 @@
 #define DW_CONV_ACCEL_KER   ((volatile int32_t*)(DW_CONV_ACCEL_BASE + 0x70))
 #define DW_CONV_ACCEL_OUT   ((volatile int32_t*)(DW_CONV_ACCEL_BASE + 0xA0))
 #define DW_CONV_ACCEL_CTRL  ((volatile int32_t*)(DW_CONV_ACCEL_BASE + 0xF0))
+
+/* NEW: Pointwise (1x1) Convolution Accelerator */
+#define PW_CONV_ACCEL_BASE   0x02000400
+#define PW_CONV_ACCEL_INPUT  ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x000))
+#define PW_CONV_ACCEL_WEIGHT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x100))
+#define PW_CONV_ACCEL_DEPTH  ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x200))
+#define PW_CONV_ACCEL_CTRL   ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x204))
+#define PW_CONV_ACCEL_RESULT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x208))
 #endif
 
 
@@ -153,26 +161,51 @@ void Conv2D_TFLM(
             }
         }
     } else if (filter_width == 1 && filter_height == 1 && stride_width == 1 && stride_height == 1) {
-        /* Highly optimized software path for 1x1 Pointwise Convolution */
+        /* Hardware-accelerated 1x1 Pointwise Convolution via dot product engine.
+         * 
+         * For each spatial position:
+         *   1. Load input vector (all channels at this position) to PW accel INPUT buffer
+         *   2. For each output channel:
+         *      - Load weight vector to PW accel WEIGHT buffer
+         *      - Trigger dot product (single-cycle hardware computation)
+         *      - Read result, add bias, quantize, store
+         *
+         * Key optimization: input vector loaded ONCE per spatial position,
+         * reused across all output channels.
+         */
         const int spatial_size = input_height * input_width;
+        
+        /* Set dot product length (once per layer) */
+        *PW_CONV_ACCEL_DEPTH = input_depth;
+        
         for (int p = 0; p < spatial_size; ++p) {
+            /* Load input values for this spatial position (all channels) */
+            for (int ic = 0; ic < input_depth; ++ic) {
+                PW_CONV_ACCEL_INPUT[ic] = (int32_t)input_data[ic * spatial_size + p] + input_offset;
+            }
+            
             for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
-                int32_t acc = bias_data ? bias_data[out_channel] : 0;
+                /* Load weights for this output channel */
                 const int8_t* filter_ptr = &filter_data[out_channel * input_depth];
-                const int8_t* in_ptr = &input_data[p];
-                
-                for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
-                    acc += filter_ptr[in_channel] * (*in_ptr + input_offset);
-                    in_ptr += spatial_size; /* jump to next channel at same spatial position */
+                for (int ic = 0; ic < input_depth; ++ic) {
+                    PW_CONV_ACCEL_WEIGHT[ic] = (int32_t)filter_ptr[ic];
                 }
-
+                
+                /* Trigger dot product computation */
+                *PW_CONV_ACCEL_CTRL = 1;
+                
+                /* Read dot product result and add bias */
+                int32_t acc = *PW_CONV_ACCEL_RESULT;
+                if (bias_data) acc += bias_data[out_channel];
+                
+                /* Apply quantization scaling */
                 acc = MultiplyByQuantizedMultiplier(
                     acc, output_multiplier[out_channel], output_shift[out_channel]);
-
+                
                 acc = acc + output_offset;
                 acc = (acc < output_activation_min) ? output_activation_min : acc;
                 acc = (acc > output_activation_max) ? output_activation_max : acc;
-
+                
                 output_data[out_channel * spatial_size + p] = (int8_t)acc;
             }
         }

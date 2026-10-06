@@ -11,7 +11,7 @@ CFLAGS = -mabi=ilp32 -march=rv32im -ffreestanding -nostdlib -O2
 
 # Source files
 C_SOURCES = main_tinymobilenet.c dl_ops.c quantize.c tinymobilenet_model_data.c
-VERILOG_SOURCES = tb.v my_soc.v picorv32.v simpleuart.v my_accel.v my_conv_accel.v my_quant_accel.v my_dw_conv_accel.v
+VERILOG_SOURCES = tb.v my_soc.v picorv32.v simpleuart.v my_accel.v my_conv_accel.v my_quant_accel.v my_dw_conv_accel.v my_pw_conv_accel.v
 
 # Default target
 all: sim
