@@ -34,6 +34,18 @@
 #define PW_CONV_ACCEL_DEPTH  ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x200))
 #define PW_CONV_ACCEL_CTRL   ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x204))
 #define PW_CONV_ACCEL_RESULT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x208))
+
+/* Test seam for tracing the hardware path; production remains volatile MMIO. */
+#ifdef PW_MMIO_TEST
+void pw_mmio_write(volatile int32_t *reg, int32_t value);
+int32_t pw_mmio_read(volatile int32_t *reg);
+#define PW_WRITE(reg, value) pw_mmio_write((reg), (value))
+#define PW_READ(reg) pw_mmio_read((reg))
+#else
+#define PW_WRITE(reg, value) (*(reg) = (value))
+#define PW_READ(reg) (*(reg))
+#endif
+
 #endif
 
 
@@ -46,11 +58,11 @@ int32_t MultiplyByQuantizedMultiplierSmallerThanOne(
     uint8_t right_shift 
 ) {
 #ifndef NATIVE_RUN
-    *QUANT_ACCEL_RAW = x;
-    *QUANT_ACCEL_MUL = quantized_multiplier;
-    *QUANT_ACCEL_SHIFT = right_shift;
-    *QUANT_ACCEL_CTRL = 1;
-    return *QUANT_ACCEL_OUT;
+    PW_WRITE(QUANT_ACCEL_RAW, x);
+    PW_WRITE(QUANT_ACCEL_MUL, quantized_multiplier);
+    PW_WRITE(QUANT_ACCEL_SHIFT, right_shift);
+    PW_WRITE(QUANT_ACCEL_CTRL, 1);
+    return PW_READ(QUANT_ACCEL_OUT);
 #else
     return RoundingDivideByPOT(
         SaturatingRoundingDoublingHighMul(x, quantized_multiplier),
@@ -176,26 +188,33 @@ void Conv2D_TFLM(
         const int spatial_size = input_height * input_width;
         
         /* Set dot product length (once per layer) */
-        *PW_CONV_ACCEL_DEPTH = input_depth;
+        PW_WRITE(PW_CONV_ACCEL_DEPTH, input_depth);
         
         for (int p = 0; p < spatial_size; ++p) {
             /* Load input values for this spatial position (all channels) */
             for (int ic = 0; ic < input_depth; ++ic) {
-                PW_CONV_ACCEL_INPUT[ic] = (int32_t)input_data[ic * spatial_size + p] + input_offset;
+                PW_WRITE(PW_CONV_ACCEL_INPUT + ic, (int32_t)input_data[ic * spatial_size + p] + input_offset);
             }
             
             for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
                 /* Load weights for this output channel */
                 const int8_t* filter_ptr = &filter_data[out_channel * input_depth];
-                for (int ic = 0; ic < input_depth; ++ic) {
-                    PW_CONV_ACCEL_WEIGHT[ic] = (int32_t)filter_ptr[ic];
+                int ic = 0;
+                for (; ic + 3 < input_depth; ic += 4) {
+                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic, (int32_t)filter_ptr[ic]);
+                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 1, (int32_t)filter_ptr[ic + 1]);
+                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 2, (int32_t)filter_ptr[ic + 2]);
+                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 3, (int32_t)filter_ptr[ic + 3]);
+                }
+                for (; ic < input_depth; ++ic) {
+                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic, (int32_t)filter_ptr[ic]);
                 }
                 
                 /* Trigger dot product computation */
-                *PW_CONV_ACCEL_CTRL = 1;
+                PW_WRITE(PW_CONV_ACCEL_CTRL, 1);
                 
                 /* Read dot product result and add bias */
-                int32_t acc = *PW_CONV_ACCEL_RESULT;
+                int32_t acc = PW_READ(PW_CONV_ACCEL_RESULT);
                 if (bias_data) acc += bias_data[out_channel];
                 
                 /* Apply quantization scaling */
