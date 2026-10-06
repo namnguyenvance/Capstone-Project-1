@@ -32,6 +32,13 @@ sim.vvp: $(VERILOG_SOURCES)
 sim: firmware.hex sim.vvp
 	$(VVP) sim.vvp
 
+# Standalone pointwise verification; unique temporary artifact, removed on exit.
+test_pw:
+	@set -eu; artifact=$$(mktemp /tmp/tb_pw_conv_accel.XXXXXX); \
+	trap 'rm -f "$$artifact"' EXIT HUP INT TERM; \
+	$(IVERILOG) -g2012 -Wall -s tb_pw_conv_accel -o "$$artifact" tb_pw_conv_accel.v my_pw_conv_accel.v; \
+	$(VVP) "$$artifact"
+
 # Training pipeline targets
 train:
 	python3 train_model.py
@@ -49,4 +56,4 @@ pipeline: train generate extract_test sim
 clean:
 	rm -f firmware.elf firmware.hex sim.vvp
 
-.PHONY: all sim clean train generate extract_test pipeline
+.PHONY: all sim clean train generate extract_test pipeline test_pw
