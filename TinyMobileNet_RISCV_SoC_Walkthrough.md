@@ -493,11 +493,15 @@ for (in_channel = 0..15) {
 | `DEPTH` | 0x200 | 128 | Số phần tử dot product (1–64) |
 | `CTRL` | 0x204 | 129 | Write `1` → trigger compute |
 | `RESULT` | 0x208 | 130 | Read: kết quả dot product |
+| `BATCH_CTRL` | 0x20C | 131 | Level 3: trigger 4 outputs; read bit 0 busy, bit 1 done |
+| `BATCH_RESULT[0..3]` | 0x210–0x21C | 132–135 | Read 4 int32 results; bus stall khi `rvalid=0` |
+| `BATCH_STATUS` | 0x220 | 136 | Read bit 0 busy, bit 1 done |
 | `PACKED_WEIGHT[0..15]` | 0x300–0x33C | 192–207 | Level 2: mỗi write chứa 4 signed int8 weights; read trả về 0 |
+| Packed banks 1/2/3 | 0x340–0x37C / 0x380–0x3BC / 0x3C0–0x3FC | 208–255 | Level 3: 16 packed words mỗi bank; read trả về 0 |
 
 Packed write tại index `192 + k` cập nhật cùng storage với legacy `WEIGHT[4*k..4*k+3]`: byte thấp nhất vào lane `4*k`, tiếp theo theo thứ tự little-endian. Mỗi byte được sign-extend thành int32. Legacy WEIGHT vẫn giữ nguyên hành vi; INPUT, DEPTH, CTRL, RESULT và phép MAC không thay đổi.
 
-**Phép tính (khi CTRL = 1):**
+**Phép tính baseline (tương đương arithmetic của legacy CTRL):**
 ```verilog
 // Blocking accumulation → non-blocking output register
 temp_sum = 0;
@@ -846,15 +850,16 @@ Score cao nhất = **115** tại index **7** → Dự đoán đúng chữ số *
 | Sim Wall Time (Icarus Verilog) | ~20 minutes |
 | Sim Time Units | 1,243,418,010,000 ps |
 
-### 9.6 Verified Level 1 và Level 2 PW Optimizations
+### 9.6 Verified Level 1, Level 2 và Level 3 PW Optimizations
 
 Các kết quả dưới đây được xác nhận bằng integrated SoC simulation với cùng flow build/simulation. **Cycle count là metric hiệu năng chính**; total bao gồm UART output giữa các layer, nên không bằng tổng cycle của riêng các layer. Wall-clock runtime của Icarus phụ thuộc máy chạy và không phải architectural speedup.
 
-| Version | Total cycles | Reduction vs baseline | Reduction vs Level 1 | Speedup vs baseline |
+| Version | Total cycles | Reduction vs baseline | Reduction vs previous version | Speedup vs baseline |
 |---------|-------------:|----------------------:|--------------------:|--------------------:|
 | Baseline | 62,071,887 | — | — | 1.0000× |
-| Level 1 | 55,395,889 | 10.76% | — | 1.1205× |
+| Level 1 | 55,395,889 | 10.76% | 10.76% | 1.1205× |
 | Level 2 | 46,579,875 | 24.96% | 15.91% | 1.333× |
+| Level 3 batch-4 | 44,156,359 | 28.86% | 5.20% | 1.4057× |
 
 | PW layer | Baseline cycles | Level 1 cycles | Level 2 cycles | Level 2 savings vs Level 1 | Level 2 savings vs baseline |
 |----------|----------------:|---------------:|---------------:|--------------------------:|---------------------------:|
@@ -874,9 +879,21 @@ Các kết quả dưới đây được xác nhận bằng integrated SoC simula
 
 Firmware kiểm tra alignment của channel weight pointer trước khi dùng `__builtin_assume_aligned` và `__builtin_memcpy` đúng 4 bytes vào `uint32_t`. Với pointer aligned, RV32IM assembly dùng một word load và một MMIO store cho 4 weights. Các PW weight pointers trong model hiện tại aligned 4 bytes, và channel depths là bội số của 4. Pointer không aligned dùng fallback ghép 4 byte theo little-endian; không dùng pointer cast vi phạm aliasing hoặc unaligned word load. Native fallback được giữ nguyên.
 
-**Non-PW timings:** Level 1 giữ nguyên toàn bộ non-PW cycles so với baseline. Level 2 chỉ thay đổi Conv0 từ **7,738,739** xuống **7,712,627** cycles (giảm **26,112**, **0.337%**) do compiler code generation. DW1 (**6,658,976**), DW2 (**10,869,269**), DW3 (**3,990,023**), GAP (**187,380**) và FC (**50,824**) đều không đổi.
+**Level 3 — four-output batch mode:** Giữ một INPUT vector dùng chung và load weights cho 4 output channels vào 4 banks. Một `BATCH_CTRL` write thay cho 4 legacy CTRL writes. Một shared dot-product datapath tính lần lượt banks 0–3; DEPTH được snapshot tại trigger. Cả 4 results được publish cùng lúc, chính xác **4 clock cycles sau accepted trigger**. Bank 0 vẫn giữ signed-int32 legacy WEIGHT semantics; banks 1–3 chứa signed-int8 packed weights. Output-channel remainder dùng Level 2 single-output path; input-depth remainder của batch dùng zero-padded packed word. Spatial-position-first traversal và INPUT reuse được giữ nguyên.
 
-**Correctness:** Cả ba phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Integrated simulation xác nhận scores và prediction không thay đổi.
+`my_soc.v` dùng `rvalid` để stall riêng BATCH_RESULT reads chưa hợp lệ, ngăn stale/partial results. Decoder 1 KiB không đổi; legacy accesses và writes vẫn acknowledge bình thường. Firmware đọc results trực tiếp, không polling hoặc fixed delay: **firmware waiting instructions = 0**. Focused bus test đo ordinary access là 2 CPU sample edges; earliest batch-result read là 5 edges (**3 extra stall cycles**). Đây là read-stall duration, khác với batch compute latency 4 cycles.
+
+| PW layer | Level 2 cycles | Verified Level 3 cycles | Savings vs Level 2 |
+|----------|---------------:|------------------------:|-------------------:|
+| PW1 [16→32] | 10,063,326 | 8,393,456 | 1,669,870 (16.59%) |
+| PW2 [32→48] | 4,903,931 | 4,286,581 | 617,350 (12.59%) |
+| PW3 [48→64] | 2,008,201 | 1,810,193 | 198,008 (9.86%) |
+
+Integrated Level 3 inference tiết kiệm **2,423,516 cycles (5.20%) so với Level 2**, và **17,915,528 cycles (28.86%) so với baseline**, đạt **1.4057× architectural speedup**. Các giá trị này dùng cycle counts, không dùng wall-clock simulation time.
+
+**Non-PW timings:** Level 1 giữ nguyên toàn bộ non-PW cycles so với baseline. Level 2 chỉ thay đổi Conv0 từ **7,738,739** xuống **7,712,627** cycles (giảm **26,112**, **0.337%**) do compiler code generation. Level 3 Conv0 tăng lên **7,775,776** cycles: regression **+63,149 cycles (+0.819%) so với Level 2**, vượt ngưỡng 0.5%. Assembly có frame **208→224 bytes** và thêm 2 row-setup stack stores, phù hợp với compiler-codegen regression đã quan sát. DW1 (**6,658,976**), DW2 (**10,869,269**), DW3 (**3,990,023**), GAP (**187,380**) và FC (**50,824**) đều không đổi. Total savings đã bao gồm Conv0 regression và inter-layer UART overhead.
+
+**Correctness:** Cả bốn phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Level 3 cũng pass standalone prototype, `make test_pw_batch`, `make test_pw_bus`, batch firmware equivalence và RTL lint. Integrated simulation xác nhận scores và prediction không thay đổi.
 
 Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của PW optimization.
 
