@@ -493,6 +493,9 @@ for (in_channel = 0..15) {
 | `DEPTH` | 0x200 | 128 | Số phần tử dot product (1–64) |
 | `CTRL` | 0x204 | 129 | Write `1` → trigger compute |
 | `RESULT` | 0x208 | 130 | Read: kết quả dot product |
+| `PACKED_WEIGHT[0..15]` | 0x300–0x33C | 192–207 | Level 2: mỗi write chứa 4 signed int8 weights; read trả về 0 |
+
+Packed write tại index `192 + k` cập nhật cùng storage với legacy `WEIGHT[4*k..4*k+3]`: byte thấp nhất vào lane `4*k`, tiếp theo theo thứ tự little-endian. Mỗi byte được sign-extend thành int32. Legacy WEIGHT vẫn giữ nguyên hành vi; INPUT, DEPTH, CTRL, RESULT và phép MAC không thay đổi.
 
 **Phép tính (khi CTRL = 1):**
 ```verilog
@@ -507,7 +510,7 @@ result_reg <= temp_sum;
 
 Tính **song song** (unrolled loop trong 1 clock cycle): **lên đến 64 phép nhân + 6-level adder tree**.
 
-**Software flow cho PW1 1×1 [16→32]:**
+**Software flow baseline cho PW1 1×1 [16→32] (legacy scalar WEIGHT writes):**
 ```c
 *PW_CONV_ACCEL_DEPTH = 16;  // dot product length = input_depth
 
@@ -786,7 +789,7 @@ Total: 2 clock cycles per MMIO access
 
 ## 9. Kết Quả Benchmark
 
-### 9.1 Cycle Count per Layer (với tất cả accelerator)
+### 9.1 Baseline Cycle Count per Layer (với tất cả accelerator)
 
 | # | Layer | Input → Output | Cycles | Accelerator |
 |---|-------|---------------|--------|-------------|
@@ -809,7 +812,7 @@ Total: 2 clock cycles per MMIO access
 
 > Speedup ~2× (thay vì lý thuyết 6-8×) vì **bottleneck chuyển sang MMIO data loading**: mỗi dot product cần 16 weight writes (4 cycles mỗi write) qua bus, trong khi phần cứng compute chỉ 1 cycle.
 
-### 9.3 Phân bố thời gian
+### 9.3 Phân bố thời gian baseline
 
 ```
 Conv0  ████████████░░░░░░░░░░░░░░░░░░░░░  12.5%
@@ -823,7 +826,7 @@ GAP    ░░░░░░░░░░░░░░░░░░░░░░░░�
 FC     ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░   0.1%
 ```
 
-### 9.4 Classification Output
+### 9.4 Baseline Classification Output
 
 ```
 === Image 0 (Target: 7) ===
@@ -833,7 +836,7 @@ FC     ░░░░░░░░░░░░░░░░░░░░░░░░�
 
 Score cao nhất = **115** tại index **7** → Dự đoán đúng chữ số **7**.
 
-### 9.5 Simulation Stats
+### 9.5 Baseline Simulation Stats
 
 | Metric | Value |
 |--------|-------|
@@ -842,6 +845,40 @@ Score cao nhất = **115** tại index **7** → Dự đoán đúng chữ số *
 | Inference Time (simulated) | ~1.24 seconds @ 50MHz |
 | Sim Wall Time (Icarus Verilog) | ~20 minutes |
 | Sim Time Units | 1,243,418,010,000 ps |
+
+### 9.6 Verified Level 1 và Level 2 PW Optimizations
+
+Các kết quả dưới đây được xác nhận bằng integrated SoC simulation với cùng flow build/simulation. **Cycle count là metric hiệu năng chính**; total bao gồm UART output giữa các layer, nên không bằng tổng cycle của riêng các layer. Wall-clock runtime của Icarus phụ thuộc máy chạy và không phải architectural speedup.
+
+| Version | Total cycles | Reduction vs baseline | Reduction vs Level 1 | Speedup vs baseline |
+|---------|-------------:|----------------------:|--------------------:|--------------------:|
+| Baseline | 62,071,887 | — | — | 1.0000× |
+| Level 1 | 55,395,889 | 10.76% | — | 1.1205× |
+| Level 2 | 46,579,875 | 24.96% | 15.91% | 1.333× |
+
+| PW layer | Baseline cycles | Level 1 cycles | Level 2 cycles | Level 2 savings vs Level 1 | Level 2 savings vs baseline |
+|----------|----------------:|---------------:|---------------:|--------------------------:|---------------------------:|
+| PW1 [16→32] | 16,744,574 | 13,890,810 | 10,063,326 | 3,827,484 (27.55%) | 6,681,248 (39.90%) |
+| PW2 [32→48] | 10,676,131 | 8,168,895 | 4,903,931 | 3,264,964 (39.97%) | 5,772,200 (54.07%) |
+| PW3 [48→64] | 5,019,251 | 3,705,655 | 2,008,201 | 1,697,454 (45.81%) | 3,011,050 (59.99%) |
+
+**Level 1 — firmware loop overhead:** Unroll WEIGHT-loading loop theo nhóm 4, giữ scalar remainder và scalar INPUT loading. Giảm loop/control overhead mà không đổi RTL hoặc MMIO transactions. Giữ spatial-position-first traversal, INPUT reuse giữa output channels và một DEPTH write mỗi layer.
+
+**Level 2 — packed WEIGHT MMIO:** Mỗi nhóm 4 weights dùng một packed write thay cho 4 legacy writes; remainder vẫn dùng legacy scalar writes. Với depths hiện tại 16/32/48, weight MMIO traffic giảm 75%:
+
+| Layer | Level 1 WEIGHT writes | Level 2 WEIGHT writes |
+|-------|----------------------:|----------------------:|
+| PW1 | 401,408 | 100,352 |
+| PW2 | 301,056 | 75,264 |
+| PW3 | 150,528 | 37,632 |
+
+Firmware kiểm tra alignment của channel weight pointer trước khi dùng `__builtin_assume_aligned` và `__builtin_memcpy` đúng 4 bytes vào `uint32_t`. Với pointer aligned, RV32IM assembly dùng một word load và một MMIO store cho 4 weights. Các PW weight pointers trong model hiện tại aligned 4 bytes, và channel depths là bội số của 4. Pointer không aligned dùng fallback ghép 4 byte theo little-endian; không dùng pointer cast vi phạm aliasing hoặc unaligned word load. Native fallback được giữ nguyên.
+
+**Non-PW timings:** Level 1 giữ nguyên toàn bộ non-PW cycles so với baseline. Level 2 chỉ thay đổi Conv0 từ **7,738,739** xuống **7,712,627** cycles (giảm **26,112**, **0.337%**) do compiler code generation. DW1 (**6,658,976**), DW2 (**10,869,269**), DW3 (**3,990,023**), GAP (**187,380**) và FC (**50,824**) đều không đổi.
+
+**Correctness:** Cả ba phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Integrated simulation xác nhận scores và prediction không thay đổi.
+
+Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của PW optimization.
 
 ---
 
