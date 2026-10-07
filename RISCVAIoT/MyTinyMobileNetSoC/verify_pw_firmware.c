@@ -11,7 +11,10 @@
 struct transaction { uintptr_t address; int32_t value; int write; };
 static struct transaction trace[8192], baseline[8192];
 static size_t trace_count, physical_count, packed_count, scalar_weight_count;
-static size_t total_physical, total_packed;
+static size_t total_physical, total_packed, batch_count, single_count;
+static size_t total_batches, total_singles, total_level2_physical;
+static int32_t extra_weights[3][64], captured[4][64], batch_results[4];
+static int batch_busy, batch_valid;
 static int32_t in[64], weight[64], depth, result, raw, multiplier, shift, quant;
 static uint32_t random_state = 0x51a7c0de;
 static unsigned cases, comparisons, clamp_hits[2], shift_hits[2], boundary_hits[2];
@@ -27,33 +30,48 @@ static int64_t arithmetic_right(int64_t value, unsigned amount) {
 void pw_mmio_write(volatile int32_t *reg, int32_t value) {
     uintptr_t address = (uintptr_t)reg;
     ++physical_count;
-    if (address >= 0x02000700 && address <= 0x0200073c) {
-        unsigned lane = (unsigned)((address - 0x02000700) / 4) * 4;
+    if (address >= 0x02000400 && address < 0x02000800 && batch_busy) abort();
+    if (address >= 0x02000700 && address <= 0x020007fc) {
+        unsigned bank = (unsigned)((address - 0x02000700) / 64);
+        unsigned lane = (unsigned)((address - 0x02000700) % 64) / 4 * 4;
         ++packed_count;
         for (unsigned byte = 0; byte < 4; ++byte) {
             unsigned bits = ((uint32_t)value >> (8 * byte)) & 255;
             int32_t signed_byte = bits < 128 ? (int32_t)bits : (int32_t)bits - 256;
-            weight[lane + byte] = signed_byte;
-            record(0x02000500 + 4 * (lane + byte), signed_byte, 1);
+            if (bank == 0) weight[lane + byte] = signed_byte;
+            else extra_weights[bank-1][lane + byte] = signed_byte;
         }
         return;
     }
-    if (address >= 0x02000500 && address < 0x02000600) ++scalar_weight_count;
-    record(address, value, 1);
-    if (address >= 0x02000400 && address < 0x02000500)
-        in[(address-0x02000400)/4] = value;
-    else if (address >= 0x02000500 && address < 0x02000600)
+    if (address >= 0x02000500 && address < 0x02000600) {
+        ++scalar_weight_count;
         weight[(address-0x02000500)/4] = value;
-    else if (address == 0x02000600) depth = value;
-    else if (address == 0x02000604) {
-        int64_t sum = 0;
-        for (int i=0; i<depth; ++i) sum += (int64_t)in[i]*weight[i];
-        if (sum < INT32_MIN || sum > INT32_MAX) abort();
-        result = (int32_t)sum;
-    } else if (address == 0x02000200) raw = value;
-    else if (address == 0x02000204) multiplier = value;
-    else if (address == 0x02000208) shift = value;
+        return;
+    }
+    if (address >= 0x02000400 && address < 0x02000500) {
+        record(address, value, 1);
+        in[(address-0x02000400)/4] = value;
+    } else if (address == 0x02000600) {
+        record(address, value, 1); depth = value;
+    } else if (address == 0x02000604 || address == 0x0200060c) {
+        int banks = address == 0x0200060c ? 4 : 1;
+        if (banks == 4) { ++batch_count; batch_busy=1; batch_valid=0; }
+        else ++single_count;
+        for (int bank=0; bank<banks; ++bank) {
+            int64_t sum=0;
+            for (int i=0; i<depth; ++i) {
+                int32_t w=bank ? extra_weights[bank-1][i] : weight[i];
+                captured[bank][i]=w;
+                sum+=(int64_t)in[i]*w;
+            }
+            batch_results[bank]=(int32_t)(uint32_t)sum;
+        }
+        if (banks == 1) result=batch_results[0];
+    } else if (address == 0x02000200) { record(address,value,1); raw = value; }
+    else if (address == 0x02000204) { record(address,value,1); multiplier = value; }
+    else if (address == 0x02000208) { record(address,value,1); shift = value; }
     else if (address == 0x02000210) {
+        record(address,value,1);
         if (shift < 0 || shift > 30) abort();
         int64_t product = (int64_t)raw*multiplier;
         int64_t high = arithmetic_right(product + (product >= 0 ?
@@ -67,18 +85,27 @@ void pw_mmio_write(volatile int32_t *reg, int32_t value) {
 int32_t pw_mmio_read(volatile int32_t *reg) {
     uintptr_t address = (uintptr_t)reg;
     int32_t value;
-    if (address == 0x02000608) value = result;
-    else if (address == 0x0200020c) value = quant;
+    if (address == 0x02000608 || (address >= 0x02000610 && address <= 0x0200061c)) {
+        unsigned bank=address == 0x02000608 ? 0 : (unsigned)(address-0x02000610)/4;
+        if (address != 0x02000608) {
+            // A hardware result read waits for all four results to publish.
+            if (batch_busy) { batch_busy=0; batch_valid=1; }
+            if (!batch_valid) abort();
+        }
+        value=address == 0x02000608 ? result : batch_results[bank];
+        for (int i=0; i<depth; ++i) record(0x02000500+4*i,captured[bank][i],1);
+        record(0x02000604,1,1);
+        record(0x02000608,value,0);
+    } else if (address == 0x0200020c) { value = quant; record(address,value,0); }
     else abort();
     ++physical_count;
-    record(address, value, 0);
     return value;
 }
 
-/* Level 1 reference: four separate legacy writes and a scalar remainder.
- * Its ordered logical trace is compared with expanded Level 2 packed writes.
- */
-static void scalar_reference(const int8_t *input_data, int spatial_size,
+/* Verified Level 2 reference. Physical batch ordering differs; canonical
+ * traces place captured logical weights/trigger before each consumed result.
+ * Quantizer ordering and values remain compared exactly. */
+static void level2_reference(const int8_t *input_data, int spatial_size,
     int input_depth, int32_t input_offset, const int8_t *filter_data,
     const int32_t *bias_data, int output_depth, int8_t *output_data,
     int32_t output_offset, const int32_t *output_multiplier,
@@ -92,10 +119,11 @@ static void scalar_reference(const int8_t *input_data, int spatial_size,
             const int8_t *filter_ptr = &filter_data[oc*input_depth];
             int ic=0;
             for (; ic+3<input_depth; ic+=4) {
-                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic, (int32_t)filter_ptr[ic]);
-                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+1, (int32_t)filter_ptr[ic+1]);
-                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+2, (int32_t)filter_ptr[ic+2]);
-                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+3, (int32_t)filter_ptr[ic+3]);
+                uint32_t word=(uint32_t)(uint8_t)filter_ptr[ic] |
+                    ((uint32_t)(uint8_t)filter_ptr[ic+1]<<8) |
+                    ((uint32_t)(uint8_t)filter_ptr[ic+2]<<16) |
+                    ((uint32_t)(uint8_t)filter_ptr[ic+3]<<24);
+                PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT+ic/4,(int32_t)word);
             }
             for (; ic<input_depth; ++ic)
                 PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic, (int32_t)filter_ptr[ic]);
@@ -120,16 +148,20 @@ static uint32_t next_random(void) {
 }
 static void reset_model(void) {
     memset(in,0,sizeof in); memset(weight,0,sizeof weight);
+    memset(extra_weights,0,sizeof extra_weights); memset(captured,0,sizeof captured);
+    memset(batch_results,0,sizeof batch_results);
+    batch_busy=batch_valid=0; batch_count=single_count=0;
     depth=result=raw=multiplier=shift=quant=0; trace_count=physical_count=packed_count=scalar_weight_count=0;
 }
 int main(void) {
     const int depths[] = {1,16,32,48,64,3,17,63};
-    int8_t input[64*6], filters[64*5], expected[6*5], actual[6*5], shifts[5];
-    int32_t biases[5], multipliers[5];
+    int8_t input[64*6], filter_storage[64*9+4], expected[6*9], actual[6*9], shifts[9];
+    int32_t biases[9], multipliers[9];
     for (unsigned di=0; di<sizeof depths/sizeof depths[0]; ++di) {
         int d=depths[di];
         for (int trial=0; trial<128; ++trial) {
-            int spatial=trial%6+1, channels=trial%5+1;
+            int spatial=trial%6+1, channels=trial%9+1;
+            int8_t *filters=filter_storage+(trial%4); // exercise alignment 0..3
             int negative_shift=(trial%4==0 || trial%4==1) && trial!=1 && trial!=5 && trial<126;
             int offset=negative_shift ? 128 : (trial%3==0 ? -17 : trial%3==1 ? 0 : 128);
             int minimum=trial%3==0 ? -10 : -128;
@@ -140,9 +172,9 @@ int main(void) {
                 filters[i]=negative_shift ? (int8_t)(next_random()%128) : (int8_t)(next_random()%256-128);
             // Directed zero and signed-extreme cases supplement random coverage.
             if (trial==1) memset(input,0,sizeof input);
-            if (trial==2) memset(filters,0,sizeof filters);
-            if (trial==3) { memset(input,0x80,sizeof input); memset(filters,0x7f,sizeof filters); }
-            if (trial==5) { memset(input,0x7f,sizeof input); memset(filters,0x80,sizeof filters); }
+            if (trial==2) memset(filters,0,64*9);
+            if (trial==3) { memset(input,0x80,sizeof input); memset(filters,0x7f,64*9); }
+            if (trial==5) { memset(input,0x7f,sizeof input); memset(filters,0x80,64*9); }
             for (int oc=0; oc<channels; ++oc) {
                 biases[oc]=negative_shift ? 100 : (int32_t)(next_random()%20001)-10000;
                 multipliers[oc]=INT32_C(1073741824)+(int32_t)(next_random()%1073741824);
@@ -151,7 +183,7 @@ int main(void) {
             }
             if (trial>=126) {
                 offset=0; minimum=-10; maximum=10;
-                memset(input,0,sizeof input); memset(filters,0,sizeof filters);
+                memset(input,0,sizeof input); memset(filters,0,64*9);
                 for (int oc=0; oc<channels; ++oc) {
                     biases[oc]=trial==126 ? 236 : 276;
                     multipliers[oc]=INT32_C(1073741824); shifts[oc]=0;
@@ -159,8 +191,9 @@ int main(void) {
             }
             const int32_t *bias=(trial%2 || trial>=126) ? biases : NULL;
             reset_model();
-            scalar_reference(input,spatial,d,offset,filters,bias,channels,expected,-128,
+            level2_reference(input,spatial,d,offset,filters,bias,channels,expected,-128,
                 multipliers,shifts,minimum,maximum);
+            total_level2_physical += physical_count;
             size_t count=trace_count;
             memcpy(baseline,trace,count*sizeof trace[0]);
             size_t wanted=1+(size_t)spatial*(d+channels*(d+7));
@@ -171,15 +204,19 @@ int main(void) {
             Conv2D_TFLM(input,input_dims,offset,filters,filter_dims,bias,bias_dims,
                 1,1,0,0,actual,output_dims,-128,multipliers,shifts,minimum,maximum);
             size_t output_count=(size_t)spatial*channels;
-            size_t wanted_packed=output_count*(d/4);
-            size_t wanted_scalar=output_count*(d%4);
-            size_t wanted_physical=1+(size_t)spatial*d+output_count*(d/4+d%4+7);
+            size_t groups=(size_t)channels/4, tail=(size_t)channels%4;
+            size_t wanted_packed=(size_t)spatial*(4*groups*((d+3)/4)+tail*(d/4));
+            size_t wanted_scalar=(size_t)spatial*tail*(d%4);
+            size_t wanted_batches=(size_t)spatial*groups;
+            size_t wanted_singles=(size_t)spatial*tail;
+            size_t wanted_physical=1+(size_t)spatial*d+wanted_packed+wanted_scalar+
+                wanted_batches+wanted_singles+6*output_count;
             if (packed_count!=wanted_packed || scalar_weight_count!=wanted_scalar ||
-                physical_count!=wanted_physical) {
+                physical_count!=wanted_physical || batch_count!=wanted_batches || single_count!=wanted_singles) {
                 fprintf(stderr,"FAIL depth=%d trial=%d packed/scalar/physical counts\n",d,trial);
                 return 1;
             }
-            total_physical+=physical_count; total_packed+=packed_count;
+            total_physical+=physical_count; total_packed+=packed_count; total_batches+=batch_count; total_singles+=single_count;
             if (trace_count!=count || memcmp(actual,expected,spatial*channels)) {
                 fprintf(stderr,"FAIL depth=%d trial=%d outputs/count\n",d,trial); return 1;
             }
@@ -197,7 +234,8 @@ int main(void) {
     if (!clamp_hits[0] || !clamp_hits[1] || !shift_hits[0] || !shift_hits[1] || !boundary_hits[0] || !boundary_hits[1]) abort();
     printf("ALL FIRMWARE PW TESTS PASSED: %u cases, %u transactions; both clamp boundaries and shift signs covered\n",
         cases,comparisons);
-    printf("Physical MMIO: %zu; packed writes: %zu; saved: %zu\n",
-        total_physical,total_packed,(size_t)comparisons-total_physical);
+    printf("Physical MMIO: Level 2 %zu; batch %zu; saved %zu; packed writes %zu\n",
+        total_level2_physical,total_physical,total_level2_physical-total_physical,total_packed);
+    printf("Batch triggers: %zu; legacy tail triggers: %zu\n",total_batches,total_singles);
     return 0;
 }

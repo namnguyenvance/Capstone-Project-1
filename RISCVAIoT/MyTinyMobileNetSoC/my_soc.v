@@ -197,6 +197,7 @@ module my_soc (
     // NEW: Pointwise Convolution Accelerator
     // ==========================================
     wire [31:0] pw_conv_accel_rdata;
+    wire pw_conv_accel_rvalid;
     wire pw_conv_accel_write_en = pw_conv_accel_sel && (mem_wstrb != 4'b0000) && !mem_ready;
     reg pw_conv_accel_ready;
 
@@ -204,7 +205,10 @@ module my_soc (
         if (!resetn) begin
             pw_conv_accel_ready <= 1'b0;
         end else begin
-            pw_conv_accel_ready <= pw_conv_accel_sel && !mem_ready;
+            // Writes and ordinary reads keep their original acknowledgement.
+            // Only an invalid BATCH_RESULT read waits for publication.
+            pw_conv_accel_ready <= pw_conv_accel_sel && !mem_ready &&
+                ((mem_wstrb != 4'b0000) || pw_conv_accel_rvalid);
         end
     end
 
@@ -215,7 +219,8 @@ module my_soc (
         .addr(mem_addr[9:2]),
         .write_en(pw_conv_accel_write_en),
         .wdata(mem_wdata),
-        .rdata(pw_conv_accel_rdata)
+        .rdata(pw_conv_accel_rdata),
+        .rvalid(pw_conv_accel_rvalid)
     );
 
     // Bus response mux (extended with DW conv accel)

@@ -26,6 +26,10 @@
  *   0x200:         Depth register (reg index 128)
  *   0x204:         Control register (reg index 129, write 1 to compute)
  *   0x208:         Result register (reg index 130, read dot product)
+ *   0x20C:         Batch trigger/status (index 131, read {done,busy})
+ *   0x210 - 0x21C: Batch results (indices 132-135, reads stall until done)
+ *   0x220:         Batch status (index 136, read {done,busy})
+ *   0x340 - 0x3FC: Packed signed-int8 weight banks 1-3 (indices 208-255)
  *   0x300 - 0x33C: Packed weight alias (16 words, reg indices 192-207)
  *                 Byte 0 -> lane 4*k; bytes sign-extended into legacy storage.
  *                 Aligned full-word writes only; reads return zero.
@@ -38,7 +42,8 @@ module my_pw_conv_accel (
     input wire [7:0] addr,       // 8-bit register address (from mem_addr[9:2])
     input wire write_en,         // Write enable from CPU
     input wire [31:0] wdata,     // Write data
-    output reg [31:0] rdata      // Read data to CPU
+    output reg [31:0] rdata,     // Read data to CPU
+    output reg rvalid           // Only batch-result reads can be invalid
 );
 
     // ==========================================
@@ -56,13 +61,36 @@ module my_pw_conv_accel (
     // Computation done flag
     reg done_reg;
 
+    // Additional banks retain packed signed-int8 semantics. Bank 0 above
+    // MUST remain int32 for legacy scalar writes/readback.
+    reg signed [7:0] batch_weights [0:191];
+    reg [6:0] batch_depth;
+    reg [1:0] batch_bank;
+    reg batch_busy, batch_done;
+    reg [31:0] batch_results [0:3];
+    wire [31:0] tree [1:127];
+    wire [6:0] active_depth = batch_busy ? batch_depth : depth_reg;
+    genvar lane, node;
+    generate
+        for (lane = 0; lane < 64; lane = lane + 1) begin: products
+            wire signed [7:0] byte_weight = batch_bank == 2'd1 ? batch_weights[lane] :
+                batch_bank == 2'd2 ? batch_weights[64+lane] : batch_weights[128+lane];
+            wire signed [31:0] selected_weight = !batch_busy || batch_bank == 2'd0 ?
+                weight_buf[lane] : {{24{byte_weight[7]}}, byte_weight};
+            assign tree[64+lane] = lane < active_depth ? input_buf[lane] * selected_weight : 32'd0;
+        end
+        for (node = 1; node < 64; node = node + 1) begin: reduction
+            assign tree[node] = tree[2*node] + tree[2*node+1];
+        end
+    endgenerate
+
+    // Batch trigger snapshots DEPTH; INPUT/weights stay stable because all
+    // busy writes (including triggers on completion edge) are ignored.
+    // Four compute edges publish all results together. Legacy RESULT/done
+    // remain independent; reset has priority over all operations.
     // Loop variables
     integer i;
     
-    // Temporary accumulator for dot product (blocking assignment)
-    reg signed [31:0] temp_sum;
-    integer j;
-
     // ==========================================
     // Write Logic + Dot Product Computation
     // ==========================================
@@ -75,6 +103,18 @@ module my_pw_conv_accel (
             depth_reg  <= 7'd0;
             result_reg <= 32'sd0;
             done_reg   <= 1'b0;
+            for (i = 0; i < 192; i = i + 1) batch_weights[i] <= 8'sd0;
+            for (i = 0; i < 4; i = i + 1) batch_results[i] <= 32'd0;
+            batch_depth <= 7'd0;
+            batch_bank <= 2'd0;
+            batch_busy <= 1'b0;
+            batch_done <= 1'b0;
+        end else if (batch_busy) begin
+            batch_results[batch_bank] <= tree[1];
+            if (batch_bank == 2'd3) begin
+                batch_busy <= 1'b0;
+                batch_done <= 1'b1;
+            end else batch_bank <= batch_bank + 2'd1;
         end else if (write_en) begin
             // Input buffer: registers 0-63
             if (addr <= 8'd63) begin
@@ -97,23 +137,20 @@ module my_pw_conv_accel (
             end
             // Control register: register 129 - trigger dot product
             else if (addr == 8'd129) begin
-                /*
-                 * Compute dot product using parallel multiply + accumulate.
-                 * 
-                 * temp_sum uses blocking assignments (=) for immediate 
-                 * sequential computation within this clock edge.
-                 * result_reg uses non-blocking (<=) to register the output.
-                 * 
-                 * This is a standard Verilog pattern: blocking for temporaries,
-                 * non-blocking for actual register outputs.
-                 */
-                temp_sum = 32'sd0;
-                for (j = 0; j < 64; j = j + 1) begin
-                    if (j < depth_reg)
-                        temp_sum = temp_sum + input_buf[j] * weight_buf[j];
-                end
-                result_reg <= temp_sum;
+                // Same one-edge legacy computation, with modulo-32-bit
+                // products/addition; the tree is shared with batch mode.
+                result_reg <= tree[1];
                 done_reg   <= 1'b1;
+            end else if (addr == 8'd131) begin
+                batch_depth <= depth_reg;
+                batch_bank <= 2'd0;
+                batch_busy <= 1'b1;
+                batch_done <= 1'b0;
+            end else if (addr >= 8'd208) begin
+                batch_weights[(addr-8'd208)*8'd4] <= $signed(wdata[7:0]);
+                batch_weights[(addr-8'd208)*8'd4+8'd1] <= $signed(wdata[15:8]);
+                batch_weights[(addr-8'd208)*8'd4+8'd2] <= $signed(wdata[23:16]);
+                batch_weights[(addr-8'd208)*8'd4+8'd3] <= $signed(wdata[31:24]);
             end
         end
     end
@@ -122,6 +159,7 @@ module my_pw_conv_accel (
     // Read Logic (combinational)
     // ==========================================
     always @(*) begin
+        rvalid = 1'b1;
         if (addr <= 8'd63) begin
             rdata = $unsigned(input_buf[addr[5:0]]);
         end else if (addr >= 8'd64 && addr <= 8'd127) begin
@@ -132,6 +170,11 @@ module my_pw_conv_accel (
             rdata = {31'd0, done_reg};
         end else if (addr == 8'd130) begin
             rdata = $unsigned(result_reg);
+        end else if (addr == 8'd131 || addr == 8'd136) begin
+            rdata = {30'd0, batch_done, batch_busy};
+        end else if (addr >= 8'd132 && addr <= 8'd135) begin
+            rvalid = resetn && batch_done;
+            rdata = rvalid ? batch_results[addr[1:0]] : 32'd0;
         end else begin
             rdata = 32'd0;
         end

@@ -39,6 +39,19 @@ test_pw:
 	$(IVERILOG) -g2012 -Wall -s tb_pw_conv_accel -o "$$artifact" tb_pw_conv_accel.v my_pw_conv_accel.v; \
 	$(VVP) "$$artifact"
 
+# Production batch arithmetic and actual SoC PW handshake, without inference.
+test_pw_batch:
+	@set -eu; artifact=$$(mktemp /tmp/tb_pw_batch.XXXXXX); \
+	trap 'rm -f "$$artifact"' EXIT HUP INT TERM; \
+	$(IVERILOG) -g2012 -Wall -s tb_pw_conv_accel_batch -o "$$artifact" tb_pw_conv_accel.v my_pw_conv_accel.v; \
+	$(VVP) "$$artifact"
+
+test_pw_bus:
+	@set -eu; artifact=$$(mktemp /tmp/tb_pw_bus.XXXXXX); \
+	trap 'rm -f "$$artifact"' EXIT HUP INT TERM; \
+	$(IVERILOG) -g2012 -Wall -s tb_pw_bus -o "$$artifact" tb_pw_bus.v $(filter-out tb.v,$(VERILOG_SOURCES)); \
+	$(VVP) "$$artifact"
+
 # Training pipeline targets
 train:
 	python3 train_model.py
@@ -56,4 +69,4 @@ pipeline: train generate extract_test sim
 clean:
 	rm -f firmware.elf firmware.hex sim.vvp
 
-.PHONY: all sim clean train generate extract_test pipeline test_pw
+.PHONY: all sim clean train generate extract_test pipeline test_pw test_pw_batch test_pw_bus

@@ -34,6 +34,8 @@
 #define PW_CONV_ACCEL_DEPTH  ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x200))
 #define PW_CONV_ACCEL_CTRL   ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x204))
 #define PW_CONV_ACCEL_PACKED_WEIGHT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x300))
+#define PW_CONV_ACCEL_BATCH_CTRL ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x20c))
+#define PW_CONV_ACCEL_BATCH_RESULT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x210))
 #define PW_CONV_ACCEL_RESULT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x208))
 
 /* Test seam for tracing the hardware path; production remains volatile MMIO. */
@@ -91,6 +93,22 @@ int32_t MultiplyByQuantizedMultiplier(
  * Used for the initial 3x3 conv layer that bootstraps channels.
  * Reused from LeNet5 with both accelerated (3x3 s1) and generic paths.
  * ======================================================================== */
+#ifndef NATIVE_RUN
+/* Little-endian packed loads: alignment is checked before the assumption. */
+static inline uint32_t PackFourWeights(const int8_t *ptr) {
+    uint32_t packed;
+    if (((uintptr_t)ptr & 3u) == 0)
+        __builtin_memcpy(&packed, __builtin_assume_aligned(ptr, 4), 4);
+    else packed = (uint32_t)(uint8_t)ptr[0] | ((uint32_t)(uint8_t)ptr[1]<<8) |
+        ((uint32_t)(uint8_t)ptr[2]<<16) | ((uint32_t)(uint8_t)ptr[3]<<24);
+    return packed;
+}
+static inline uint32_t PackWeightTail(const int8_t *ptr, int count) {
+    uint32_t packed = 0;
+    for (int i = 0; i < count; ++i) packed |= (uint32_t)(uint8_t)ptr[i]<<(8*i);
+    return packed;
+}
+#endif
 void Conv2D_TFLM(
     const int8_t* input_data , const int* input_dims , int32_t input_offset,
     const int8_t* filter_data, const int* filter_dims, 
@@ -178,10 +196,9 @@ void Conv2D_TFLM(
          * 
          * For each spatial position:
          *   1. Load input vector (all channels at this position) to PW accel INPUT buffer
-         *   2. For each output channel:
-         *      - Load weight vector to PW accel WEIGHT buffer
-         *      - Trigger dot product (single-cycle hardware computation)
-         *      - Read result, add bias, quantize, store
+         *   2. Batch four output channels with fixed packed bank addresses.
+         *      Result reads wait in the bus for four-cycle completion.
+         *   3. Process leftover channels through the Level 2 scalar-output path.
          *
          * Key optimization: input vector loaded ONCE per spatial position,
          * reused across all output channels.
@@ -197,7 +214,91 @@ void Conv2D_TFLM(
                 PW_WRITE(PW_CONV_ACCEL_INPUT + ic, (int32_t)input_data[ic * spatial_size + p] + input_offset);
             }
             
-            for (int out_channel = 0; out_channel < output_depth; ++out_channel) {
+            int out_channel = 0;
+            for (; out_channel + 3 < output_depth; out_channel += 4) {
+                /* Fixed bank addresses; one lane loop for four channels. */
+                int ic = 0;
+                const int8_t *w0 = filter_data + (out_channel + 0) * input_depth;
+                const int8_t *w1 = filter_data + (out_channel + 1) * input_depth;
+                const int8_t *w2 = filter_data + (out_channel + 2) * input_depth;
+                const int8_t *w3 = filter_data + (out_channel + 3) * input_depth;
+                for (; ic + 3 < input_depth; ic += 4) {
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 0 + ic / 4, (int32_t)PackFourWeights(w0 + ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 16 + ic / 4, (int32_t)PackFourWeights(w1 + ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 32 + ic / 4, (int32_t)PackFourWeights(w2 + ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 48 + ic / 4, (int32_t)PackFourWeights(w3 + ic));
+                }
+                if (ic < input_depth) {
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 0 + ic / 4, (int32_t)PackWeightTail(w0 + ic, input_depth - ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 16 + ic / 4, (int32_t)PackWeightTail(w1 + ic, input_depth - ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 32 + ic / 4, (int32_t)PackWeightTail(w2 + ic, input_depth - ic));
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + 48 + ic / 4, (int32_t)PackWeightTail(w3 + ic, input_depth - ic));
+                }
+                /* Result loads wait in the bus until all four results publish. */
+                PW_WRITE(PW_CONV_ACCEL_BATCH_CTRL, 1);
+                {
+                    /* Read result, then preserve the per-channel arithmetic order. */
+                    int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 0);
+                    if (bias_data) acc += bias_data[out_channel + 0];
+
+                    /* Apply quantization scaling */
+                    acc = MultiplyByQuantizedMultiplier(
+                        acc, output_multiplier[out_channel + 0], output_shift[out_channel + 0]);
+
+                    acc = acc + output_offset;
+                    acc = (acc < output_activation_min) ? output_activation_min : acc;
+                    acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                    output_data[(out_channel + 0) * spatial_size + p] = (int8_t)acc;
+                }
+                {
+                    /* Read result, then preserve the per-channel arithmetic order. */
+                    int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 1);
+                    if (bias_data) acc += bias_data[out_channel + 1];
+
+                    /* Apply quantization scaling */
+                    acc = MultiplyByQuantizedMultiplier(
+                        acc, output_multiplier[out_channel + 1], output_shift[out_channel + 1]);
+
+                    acc = acc + output_offset;
+                    acc = (acc < output_activation_min) ? output_activation_min : acc;
+                    acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                    output_data[(out_channel + 1) * spatial_size + p] = (int8_t)acc;
+                }
+                {
+                    /* Read result, then preserve the per-channel arithmetic order. */
+                    int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 2);
+                    if (bias_data) acc += bias_data[out_channel + 2];
+
+                    /* Apply quantization scaling */
+                    acc = MultiplyByQuantizedMultiplier(
+                        acc, output_multiplier[out_channel + 2], output_shift[out_channel + 2]);
+
+                    acc = acc + output_offset;
+                    acc = (acc < output_activation_min) ? output_activation_min : acc;
+                    acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                    output_data[(out_channel + 2) * spatial_size + p] = (int8_t)acc;
+                }
+                {
+                    /* Read result, then preserve the per-channel arithmetic order. */
+                    int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 3);
+                    if (bias_data) acc += bias_data[out_channel + 3];
+
+                    /* Apply quantization scaling */
+                    acc = MultiplyByQuantizedMultiplier(
+                        acc, output_multiplier[out_channel + 3], output_shift[out_channel + 3]);
+
+                    acc = acc + output_offset;
+                    acc = (acc < output_activation_min) ? output_activation_min : acc;
+                    acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                    output_data[(out_channel + 3) * spatial_size + p] = (int8_t)acc;
+                }
+
+            }
+            for (; out_channel < output_depth; ++out_channel) {
                 /* Load weights for this output channel */
                 const int8_t* filter_ptr = &filter_data[out_channel * input_depth];
                 int ic = 0;
