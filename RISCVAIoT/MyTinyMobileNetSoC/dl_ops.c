@@ -33,6 +33,7 @@
 #define PW_CONV_ACCEL_WEIGHT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x100))
 #define PW_CONV_ACCEL_DEPTH  ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x200))
 #define PW_CONV_ACCEL_CTRL   ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x204))
+#define PW_CONV_ACCEL_PACKED_WEIGHT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x300))
 #define PW_CONV_ACCEL_RESULT ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 0x208))
 
 /* Test seam for tracing the hardware path; production remains volatile MMIO. */
@@ -201,10 +202,19 @@ void Conv2D_TFLM(
                 const int8_t* filter_ptr = &filter_data[out_channel * input_depth];
                 int ic = 0;
                 for (; ic + 3 < input_depth; ic += 4) {
-                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic, (int32_t)filter_ptr[ic]);
-                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 1, (int32_t)filter_ptr[ic + 1]);
-                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 2, (int32_t)filter_ptr[ic + 2]);
-                    PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic + 3, (int32_t)filter_ptr[ic + 3]);
+                    uint32_t packed;
+                    /* RV32 is little-endian. Check the channel base before
+                     * assuming alignment; ic advances in multiples of four.
+                     * memcpy preserves aliasing rules and reads exactly 4 bytes.
+                     */
+                    if (((uintptr_t)filter_ptr & 3u) == 0)
+                        __builtin_memcpy(&packed, __builtin_assume_aligned(filter_ptr + ic, 4), sizeof packed);
+                    else
+                        packed = (uint32_t)(uint8_t)filter_ptr[ic] |
+                            ((uint32_t)(uint8_t)filter_ptr[ic + 1] << 8) |
+                            ((uint32_t)(uint8_t)filter_ptr[ic + 2] << 16) |
+                            ((uint32_t)(uint8_t)filter_ptr[ic + 3] << 24);
+                    PW_WRITE(PW_CONV_ACCEL_PACKED_WEIGHT + ic / 4, (int32_t)packed);
                 }
                 for (; ic < input_depth; ++ic) {
                     PW_WRITE(PW_CONV_ACCEL_WEIGHT + ic, (int32_t)filter_ptr[ic]);

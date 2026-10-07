@@ -26,6 +26,9 @@
  *   0x200:         Depth register (reg index 128)
  *   0x204:         Control register (reg index 129, write 1 to compute)
  *   0x208:         Result register (reg index 130, read dot product)
+ *   0x300 - 0x33C: Packed weight alias (16 words, reg indices 192-207)
+ *                 Byte 0 -> lane 4*k; bytes sign-extended into legacy storage.
+ *                 Aligned full-word writes only; reads return zero.
  */
 module my_pw_conv_accel (
     input wire clk,
@@ -80,6 +83,13 @@ module my_pw_conv_accel (
             // Weight buffer: registers 64-127
             else if (addr >= 8'd64 && addr <= 8'd127) begin
                 weight_buf[addr[5:0]] <= $signed(wdata);
+            end
+            // Packed alias: four signed int8 weights, lowest lane in low byte.
+            else if (addr >= 8'd192 && addr <= 8'd207) begin
+                weight_buf[{addr[3:0], 2'b00}] <= $signed({{24{wdata[7]}}, wdata[7:0]});
+                weight_buf[{addr[3:0], 2'b01}] <= $signed({{24{wdata[15]}}, wdata[15:8]});
+                weight_buf[{addr[3:0], 2'b10}] <= $signed({{24{wdata[23]}}, wdata[23:16]});
+                weight_buf[{addr[3:0], 2'b11}] <= $signed({{24{wdata[31]}}, wdata[31:24]});
             end
             // Depth register: register 128
             else if (addr == 8'd128) begin

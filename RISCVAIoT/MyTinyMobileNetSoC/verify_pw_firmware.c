@@ -10,7 +10,8 @@
 
 struct transaction { uintptr_t address; int32_t value; int write; };
 static struct transaction trace[8192], baseline[8192];
-static size_t trace_count;
+static size_t trace_count, physical_count, packed_count, scalar_weight_count;
+static size_t total_physical, total_packed;
 static int32_t in[64], weight[64], depth, result, raw, multiplier, shift, quant;
 static uint32_t random_state = 0x51a7c0de;
 static unsigned cases, comparisons, clamp_hits[2], shift_hits[2], boundary_hits[2];
@@ -25,6 +26,19 @@ static int64_t arithmetic_right(int64_t value, unsigned amount) {
 }
 void pw_mmio_write(volatile int32_t *reg, int32_t value) {
     uintptr_t address = (uintptr_t)reg;
+    ++physical_count;
+    if (address >= 0x02000700 && address <= 0x0200073c) {
+        unsigned lane = (unsigned)((address - 0x02000700) / 4) * 4;
+        ++packed_count;
+        for (unsigned byte = 0; byte < 4; ++byte) {
+            unsigned bits = ((uint32_t)value >> (8 * byte)) & 255;
+            int32_t signed_byte = bits < 128 ? (int32_t)bits : (int32_t)bits - 256;
+            weight[lane + byte] = signed_byte;
+            record(0x02000500 + 4 * (lane + byte), signed_byte, 1);
+        }
+        return;
+    }
+    if (address >= 0x02000500 && address < 0x02000600) ++scalar_weight_count;
     record(address, value, 1);
     if (address >= 0x02000400 && address < 0x02000500)
         in[(address-0x02000400)/4] = value;
@@ -56,12 +70,13 @@ int32_t pw_mmio_read(volatile int32_t *reg) {
     if (address == 0x02000608) value = result;
     else if (address == 0x0200020c) value = quant;
     else abort();
+    ++physical_count;
     record(address, value, 0);
     return value;
 }
 
-/* Frozen scalar algorithm from the pre-optimization hardware PW branch.
- * Only volatile accesses are replaced with the same tracing functions.
+/* Level 1 reference: four separate legacy writes and a scalar remainder.
+ * Its ordered logical trace is compared with expanded Level 2 packed writes.
  */
 static void scalar_reference(const int8_t *input_data, int spatial_size,
     int input_depth, int32_t input_offset, const int8_t *filter_data,
@@ -75,7 +90,14 @@ static void scalar_reference(const int8_t *input_data, int spatial_size,
                 (int32_t)input_data[ic*spatial_size+p]+input_offset);
         for (int oc=0; oc<output_depth; ++oc) {
             const int8_t *filter_ptr = &filter_data[oc*input_depth];
-            for (int ic=0; ic<input_depth; ++ic)
+            int ic=0;
+            for (; ic+3<input_depth; ic+=4) {
+                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic, (int32_t)filter_ptr[ic]);
+                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+1, (int32_t)filter_ptr[ic+1]);
+                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+2, (int32_t)filter_ptr[ic+2]);
+                PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic+3, (int32_t)filter_ptr[ic+3]);
+            }
+            for (; ic<input_depth; ++ic)
                 PW_WRITE(PW_CONV_ACCEL_WEIGHT+ic, (int32_t)filter_ptr[ic]);
             PW_WRITE(PW_CONV_ACCEL_CTRL, 1);
             int32_t acc = PW_READ(PW_CONV_ACCEL_RESULT);
@@ -98,7 +120,7 @@ static uint32_t next_random(void) {
 }
 static void reset_model(void) {
     memset(in,0,sizeof in); memset(weight,0,sizeof weight);
-    depth=result=raw=multiplier=shift=quant=0; trace_count=0;
+    depth=result=raw=multiplier=shift=quant=0; trace_count=physical_count=packed_count=scalar_weight_count=0;
 }
 int main(void) {
     const int depths[] = {1,16,32,48,64,3,17,63};
@@ -148,6 +170,16 @@ int main(void) {
             int output_dims[]={spatial,1,channels}, bias_dims[]={channels};
             Conv2D_TFLM(input,input_dims,offset,filters,filter_dims,bias,bias_dims,
                 1,1,0,0,actual,output_dims,-128,multipliers,shifts,minimum,maximum);
+            size_t output_count=(size_t)spatial*channels;
+            size_t wanted_packed=output_count*(d/4);
+            size_t wanted_scalar=output_count*(d%4);
+            size_t wanted_physical=1+(size_t)spatial*d+output_count*(d/4+d%4+7);
+            if (packed_count!=wanted_packed || scalar_weight_count!=wanted_scalar ||
+                physical_count!=wanted_physical) {
+                fprintf(stderr,"FAIL depth=%d trial=%d packed/scalar/physical counts\n",d,trial);
+                return 1;
+            }
+            total_physical+=physical_count; total_packed+=packed_count;
             if (trace_count!=count || memcmp(actual,expected,spatial*channels)) {
                 fprintf(stderr,"FAIL depth=%d trial=%d outputs/count\n",d,trial); return 1;
             }
@@ -165,5 +197,7 @@ int main(void) {
     if (!clamp_hits[0] || !clamp_hits[1] || !shift_hits[0] || !shift_hits[1] || !boundary_hits[0] || !boundary_hits[1]) abort();
     printf("ALL FIRMWARE PW TESTS PASSED: %u cases, %u transactions; both clamp boundaries and shift signs covered\n",
         cases,comparisons);
+    printf("Physical MMIO: %zu; packed writes: %zu; saved: %zu\n",
+        total_physical,total_packed,(size_t)comparisons-total_physical);
     return 0;
 }

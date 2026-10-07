@@ -54,7 +54,8 @@ module tb_pw_conv_accel;
             @(negedge clk); resetn = 0;
             // Reset must win even with a write presented.
             addr = 0; wdata = 32'hdeadbeef; write_en = 1;
-            repeat (2) @(negedge clk);
+            @(negedge clk); addr = 207; wdata = 32'h7f00ff80;
+            @(negedge clk);
             resetn = 1; write_en = 0;
             for (integer n = 0; n < 128; n = n + 1) check_reg(n, 0);
             check_reg(128, 0); check_reg(129, 0); check_reg(130, 0);
@@ -74,6 +75,22 @@ module tb_pw_conv_accel;
             for (integer n = 0; n < 64; n = n + 1) begin
                 write_reg(n, inputs[n]); write_reg(64+n, weights[n]);
             end
+        end
+    endtask
+
+    function [31:0] pack_group(input integer base_lane);
+        begin
+            pack_group = {weights[base_lane+3][7:0], weights[base_lane+2][7:0],
+                          weights[base_lane+1][7:0], weights[base_lane][7:0]};
+        end
+    endfunction
+
+    task load_packed_weights(input integer depth);
+        integer n;
+        begin
+            for (n = 0; n + 3 < depth; n = n + 4)
+                write_reg(192+n/4, pack_group(n));
+            for (; n < depth; n = n + 1) write_reg(64+n, weights[n]);
         end
     endtask
 
@@ -149,10 +166,75 @@ module tb_pw_conv_accel;
         @(negedge clk); check_reg(0, 32'h80000000);
         write_reg(130, 32'hffffffff); check_reg(130, 0);
         for (i = 131; i < 256; i = i + 1) begin
-            write_reg(i, 32'hffffffff); check_reg(i, 0);
+            if (i < 192 || i > 207) write_reg(i, 32'hffffffff);
+            check_reg(i, 0);
         end
         check_reg(128, 48); check_reg(130, 0);
         $display("[PASS] register addressing");
+
+        // Every packed address, byte order, sign extension and neighbor safety.
+        fill(123456, 32'h12345678); load_vectors;
+        write_reg(128, 1); write_reg(129, 1); read_reg(130, old_result);
+        for (k = 0; k < 16; k = k + 1) begin
+            weights[4*k]=-128; weights[4*k+1]=-1;
+            weights[4*k+2]=0; weights[4*k+3]=127;
+            write_reg(192+k, 32'h7f00ff80);
+            check_reg(192+k, 0);
+            for (i=0; i<64; i=i+1) begin
+                check_reg(64+i, weights[i]); check_reg(i, inputs[i]);
+            end
+            check_reg(128, 1); check_reg(130, old_result); check_reg(129, 1);
+        end
+        // Scalar after packed, then packed after scalar (including wide int32).
+        write_reg(65, 32'h89abcdef); check_reg(65, 32'h89abcdef);
+        check_reg(64,-128); check_reg(66,0); check_reg(67,127);
+        write_reg(192, 32'h01020304);
+        check_reg(64,4); check_reg(65,3); check_reg(66,2); check_reg(67,1);
+        // Disabled packed write must not affect any of its four lanes.
+        @(negedge clk); addr=192; wdata=32'hffffffff; write_en=0;
+        @(negedge clk);
+        check_reg(64,4); check_reg(65,3); check_reg(66,2); check_reg(67,1);
+        // Back-to-back packed writes, first and last groups.
+        @(negedge clk); addr=192; wdata=32'h7f00ff80; write_en=1;
+        @(negedge clk); addr=207; wdata=32'h80ff007f;
+        @(negedge clk); write_en=0;
+        check_reg(64,-128); check_reg(65,-1); check_reg(66,0); check_reg(67,127);
+        check_reg(124,127); check_reg(125,0); check_reg(126,-1); check_reg(127,-128);
+        reset_dut; // Includes a packed write while reset is asserted.
+        // A packed write after reset must leave done/result/depth untouched.
+        write_reg(192,32'h7f00ff80);
+        check_reg(128,0); check_reg(129,0); check_reg(130,0);
+        // Exhaust all 256 byte encodings in each byte position.
+        for (a=0; a<256; a=a+1) begin
+            for (i=0; i<4; i=i+1) begin
+                weights[i]=0;
+            end
+            for (lane=0; lane<4; lane=lane+1) begin
+                weights[lane]=$signed(a[7:0]);
+                write_reg(192,pack_group(0));
+                for (i=0; i<4; i=i+1) check_reg(64+i,weights[i]);
+                weights[lane]=0;
+            end
+        end
+        // Legacy versus packed computation, including tails and excluded lanes.
+        for (k=0; k<8; k=k+1) begin
+            case (k) 0:d=1; 1:d=3; 2:d=16; 3:d=17;
+                     4:d=32; 5:d=48; 6:d=63; 7:d=64; endcase
+            for (a=0; a<20; a=a+1) begin
+                for (i=0; i<64; i=i+1) begin
+                    rng=next_random(rng); inputs[i]=$signed(rng[7:0])+128;
+                    rng=next_random(rng); weights[i]=$signed(rng[7:0]);
+                end
+                run_vector(d); read_reg(130,old_result);
+                // Poison active lanes so a missing packed or tail write fails.
+                for (i=0; i<d; i=i+1) write_reg(64+i,32'h12345678);
+                load_packed_weights(d);
+                for (i=0; i<64; i=i+1) check_reg(64+i,weights[i]);
+                compute_check(d); check_reg(130,old_result);
+            end
+        end
+        $display("[PASS] packed weights: addressing, signed bytes, reset, overwrites, tails, equivalence");
+        reset_dut;
 
         edges[0]=-128; edges[1]=-127; edges[2]=-1; edges[3]=0;
         edges[4]=1; edges[5]=126; edges[6]=127;
