@@ -850,7 +850,7 @@ Score cao nhất = **115** tại index **7** → Dự đoán đúng chữ số *
 | Sim Wall Time (Icarus Verilog) | ~20 minutes |
 | Sim Time Units | 1,243,418,010,000 ps |
 
-### 9.6 Verified Level 1–5 Optimizations
+### 9.6 Verified Level 1–6 Optimizations
 
 Các kết quả dưới đây được xác nhận bằng integrated SoC simulation với cùng flow build/simulation. **Cycle count là metric hiệu năng chính**; total bao gồm UART output giữa các layer, nên không bằng tổng cycle của riêng các layer. Wall-clock runtime của Icarus phụ thuộc máy chạy và không phải architectural speedup.
 
@@ -862,6 +862,7 @@ Các kết quả dưới đây được xác nhận bằng integrated SoC simula
 | Level 3 batch-4 | 44,156,359 | 28.86% | 5.20% | 1.4057× |
 | Level 4 DW2 reuse / CPU codegen | 36,208,913 | 41.67% | 18.00% | 1.7143× |
 | Level 5 PW1 persistent weights | 31,135,055 | 49.84% | 14.01% | 1.9936× |
+| Level 6 Conv0 tile-first reuse | 26,523,121 | 57.27% | 14.81% | 2.3403× |
 
 | PW layer | Baseline cycles | Level 1 cycles | Level 2 cycles | Level 2 savings vs Level 1 | Level 2 savings vs baseline |
 |----------|----------------:|---------------:|---------------:|--------------------------:|---------------------------:|
@@ -939,9 +940,40 @@ Level 5 tiết kiệm **30,936,832 cycles (49.84%) so với original baseline 62
 
 Level 5 focused verification pass: legacy PW/batch tests, cache tests cho toàn bộ 32 channels và 784 positions, preload/addressing, reset, invalid/incomplete preload, busy writes, stale results và wraparound; actual PW1 tensor byte-for-byte equivalence; normalized logical PW trace và ordered quantizer trace; compiled RV32IM wraparound checks, unchanged native verification, firmware rebuild và RTL lint. Integrated simulation xác nhận scores bit-exact, prediction **7** và expected label **7**.
 
-**Correctness:** Cả sáu phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Level 3 cũng pass standalone prototype, `make test_pw_batch`, `make test_pw_bus`, batch firmware equivalence và RTL lint. Integrated simulation xác nhận scores và prediction không thay đổi.
+**Level 6 — Conv0 tile-first input reuse:** Firmware thêm exact-shape **`TileConv0Hardware`** helper cho input **28×28×1**, output **28×28×16**, kernel **3×3**, stride 1 và padding 1. Traversal theo spatial tile trước: mỗi patch **5×5** được construct/load **một lần**, giữ trong INPUT registers và dùng lại qua toàn bộ **16 output channels**. Mỗi channel vẫn load kernel, trigger existing convolution accelerator, rồi xử lý valid results theo thứ tự bias → requantization → output offset → clamp → CHW store. **Không thay đổi RTL**; signed-int8 input/filter interpretation, `input_offset`, literal-zero padding và modulo-32-bit wraparound được bảo toàn. Quantizer behavior và số quantizer transactions không đổi.
 
-Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của các optimization Level 1–5.
+| Conv0 traffic | Level 5 | Level 6 |
+|---------------|--------:|--------:|
+| INPUT MMIO writes | 40,000 | 2,500 |
+| Valid input RAM loads | 33,856 | 2,116 |
+| Kernel writes | 14,400 | 14,400 |
+| Accelerator triggers | 1,600 | 1,600 |
+| RESULT reads | 14,400 | 12,544 |
+| Invalid boundary RESULT reads | 1,856 | **0** |
+| Quantizer transactions | 62,720 | 62,720 |
+
+Final row/column/corner tiles chỉ đọc và store valid outputs; bounds checks ngăn invalid source reads và padding giữ **literal zero**, không cộng input offset. Generic Conv2D core assembly giữ nguyên. PW1 cached helper và PW2/PW3 cores cũng không đổi; chỉ có small dispatcher overhead đo được: **PW1 +28 cycles, PW2 +57 cycles, PW3 +57 cycles**. DW1/DW2/DW3, GAP và FC đều cycle-identical so với Level 5.
+
+| Layer | Verified Level 5 cycles | Verified Level 6 cycles | Savings vs Level 5 |
+|-------|------------------------:|------------------------:|-------------------:|
+| Conv0 | 7,776,032 | **3,163,926** | **4,612,106 (59.31%)** |
+| DW1 | 6,421,895 | 6,421,895 | 0 |
+| PW1 | 3,318,925 | 3,318,953 | −28 (dispatcher overhead) |
+| DW2 | 3,994,547 | 3,994,547 | 0 |
+| PW2 | 4,286,837 | 4,286,894 | −57 (dispatcher overhead) |
+| DW3 | 3,155,797 | 3,155,797 | 0 |
+| PW3 | 1,810,449 | 1,810,506 | −57 (dispatcher overhead) |
+| GAP | 187,380 | 187,380 | 0 |
+| FC | 50,824 | 50,824 | 0 |
+| **Total inference** | **31,135,055** | **26,523,121** | **4,611,934 (14.81%)** |
+
+Level 6 tiết kiệm **35,548,766 cycles (57.27%) so với original baseline 62,071,887**, đạt **2.3403× architectural speedup**. Forecast total là **26,465,045**; measured total **26,523,121** cao hơn **58,076 cycles**, tương ứng forecast error **0.2194%**. Total bao gồm caller/setup và inter-layer UART output nên không bằng tổng các layer timings. Wall-clock simulation time là **13m 58.22s**, exit status **0**; **architectural speedup dùng cycle counts, không dùng wall-clock time**.
+
+Level 6 focused verification pass: actual Conv0 tensor byte-for-byte, 48 full-tensor cases với signed extremes, extreme offsets, padding/boundaries, nullable bias, cả hai shift signs, clamp boundaries, seeded random và wraparound; compiled RV32IM wraparound/quantizer-operand checks, output canaries và AddressSanitizer (`detect_leaks=0` cho ptrace environment), unchanged native verification và firmware rebuild. Integrated simulation xác nhận scores chính xác **`[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`**, predicted class **7**, expected label **7**. LED vẫn **0xFF** do known one-image-versus-100 reporting issue.
+
+**Correctness:** Cả bảy phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Level 3 cũng pass standalone prototype, `make test_pw_batch`, `make test_pw_bus`, batch firmware equivalence và RTL lint. Integrated simulation xác nhận scores và prediction không thay đổi.
+
+Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của các optimization Level 1–6.
 
 ---
 
