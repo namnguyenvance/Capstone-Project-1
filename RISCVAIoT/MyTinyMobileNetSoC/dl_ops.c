@@ -109,7 +109,114 @@ static inline uint32_t PackWeightTail(const int8_t *ptr, int count) {
     return packed;
 }
 #endif
+#ifndef NATIVE_RUN
+/* PW1-only resident weights: 128 packed words in channel-major order. */
+#define PW_CONV_ACCEL_CACHE_INDEX ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 137 * 4))
+#define PW_CONV_ACCEL_CACHE_DATA ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 138 * 4))
+#define PW_CONV_ACCEL_CACHE_CTRL ((volatile int32_t*)(PW_CONV_ACCEL_BASE + 139 * 4))
+struct CacheContext {
+    int32_t input_offset;
+    const int32_t *bias_data;
+    int32_t output_offset;
+    const int32_t *output_multiplier;
+    const int8_t *output_shift;
+    int32_t output_activation_min, output_activation_max;
+};
+static __attribute__((noinline)) void CachedPW1Hardware(
+    const int8_t *input_data, const int8_t *filter_data,
+    int8_t *output_data, const struct CacheContext *ctx
+) {
+    const int spatial_size = 784;
+    const int32_t input_offset = ctx->input_offset;
+    const int32_t *bias_data = ctx->bias_data;
+    const int32_t output_offset = ctx->output_offset;
+    const int32_t *output_multiplier = ctx->output_multiplier;
+    const int8_t *output_shift = ctx->output_shift;
+    const int32_t output_activation_min = ctx->output_activation_min;
+    const int32_t output_activation_max = ctx->output_activation_max;
+
+    PW_WRITE(PW_CONV_ACCEL_DEPTH, 16);
+    PW_WRITE(PW_CONV_ACCEL_CACHE_INDEX, 0);
+    for (int word = 0; word < 128; ++word)
+        PW_WRITE(PW_CONV_ACCEL_CACHE_DATA, (int32_t)PackFourWeights(filter_data + 4 * word));
+
+    for (int p = 0; p < spatial_size; ++p) {
+        for (int ic = 0; ic < 16; ++ic)
+            PW_WRITE(PW_CONV_ACCEL_INPUT + ic,
+                (int32_t)input_data[ic * spatial_size + p] + input_offset);
+        for (int out_channel = 0; out_channel < 32; out_channel += 4) {
+            /* Group select and trigger share one write; result reads wait in hardware. */
+            PW_WRITE(PW_CONV_ACCEL_CACHE_CTRL, out_channel / 4);
+            {
+                /* Read result, then preserve the per-channel arithmetic order. */
+                int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 0);
+                if (bias_data) acc += bias_data[out_channel + 0];
+
+                /* Apply quantization scaling */
+                acc = MultiplyByQuantizedMultiplier(
+                    acc, output_multiplier[out_channel + 0], output_shift[out_channel + 0]);
+
+                acc = acc + output_offset;
+                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                output_data[(out_channel + 0) * spatial_size + p] = (int8_t)acc;
+            }
+            {
+                /* Read result, then preserve the per-channel arithmetic order. */
+                int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 1);
+                if (bias_data) acc += bias_data[out_channel + 1];
+
+                /* Apply quantization scaling */
+                acc = MultiplyByQuantizedMultiplier(
+                    acc, output_multiplier[out_channel + 1], output_shift[out_channel + 1]);
+
+                acc = acc + output_offset;
+                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                output_data[(out_channel + 1) * spatial_size + p] = (int8_t)acc;
+            }
+            {
+                /* Read result, then preserve the per-channel arithmetic order. */
+                int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 2);
+                if (bias_data) acc += bias_data[out_channel + 2];
+
+                /* Apply quantization scaling */
+                acc = MultiplyByQuantizedMultiplier(
+                    acc, output_multiplier[out_channel + 2], output_shift[out_channel + 2]);
+
+                acc = acc + output_offset;
+                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                output_data[(out_channel + 2) * spatial_size + p] = (int8_t)acc;
+            }
+            {
+                /* Read result, then preserve the per-channel arithmetic order. */
+                int32_t acc = PW_READ(PW_CONV_ACCEL_BATCH_RESULT + 3);
+                if (bias_data) acc += bias_data[out_channel + 3];
+
+                /* Apply quantization scaling */
+                acc = MultiplyByQuantizedMultiplier(
+                    acc, output_multiplier[out_channel + 3], output_shift[out_channel + 3]);
+
+                acc = acc + output_offset;
+                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                output_data[(out_channel + 3) * spatial_size + p] = (int8_t)acc;
+            }
+        }
+    }
+}
+#endif
+#ifndef NATIVE_RUN
+/* Keep the verified Level 4 body behind an independent compiler boundary. */
+static __attribute__((noinline,noipa)) void Conv2DLevel4(
+#else
 void Conv2D_TFLM(
+#endif
     const int8_t* input_data , const int* input_dims , int32_t input_offset,
     const int8_t* filter_data, const int* filter_dims, 
     const int32_t* bias_data , const int* bias_dims, 
@@ -388,6 +495,38 @@ void Conv2D_TFLM(
         }
     }
 }
+#ifndef NATIVE_RUN
+void Conv2D_TFLM(
+    const int8_t* input_data , const int* input_dims , int32_t input_offset,
+    const int8_t* filter_data, const int* filter_dims,
+    const int32_t* bias_data , const int* bias_dims,
+    int stride_width, int stride_height,
+    int pad_width   , int pad_height,
+    int8_t* output_data      , const int* output_dims, int32_t output_offset,
+    const int32_t* output_multiplier,
+    const int8_t*  output_shift,
+    int32_t output_activation_min, int32_t output_activation_max
+) {
+    /* Exact PW1 shape only; all other calls retain the verified Level 4 core. */
+    if (input_dims[2] == 16 && output_dims[2] == 32 &&
+        input_dims[0] == 28 && input_dims[1] == 28 &&
+        output_dims[0] == 28 && output_dims[1] == 28 &&
+        filter_dims[0] == 1 && filter_dims[1] == 1 && filter_dims[2] == 16 &&
+        stride_width == 1 && stride_height == 1 && pad_width == 0 && pad_height == 0) {
+        const struct CacheContext ctx = {
+            input_offset, bias_data, output_offset, output_multiplier,
+            output_shift, output_activation_min, output_activation_max
+        };
+        CachedPW1Hardware(input_data, filter_data, output_data, &ctx);
+        return;
+    }
+    Conv2DLevel4(input_data, input_dims, input_offset, filter_data, filter_dims,
+        bias_data, bias_dims, stride_width, stride_height, pad_width, pad_height,
+        output_data, output_dims, output_offset, output_multiplier, output_shift,
+        output_activation_min, output_activation_max);
+}
+#endif
+
 
 
 #ifndef NATIVE_RUN

@@ -29,6 +29,14 @@
  *   0x20C:         Batch trigger/status (index 131, read {done,busy})
  *   0x210 - 0x21C: Batch results (indices 132-135, reads stall until done)
  *   0x220:         Batch status (index 136, read {done,busy})
+ *   0x224:         Cache preload index (137): clear validity; set word 0..127
+ *   0x228:         Cache packed data (138): four bytes, auto-increment; read zero
+ *   0x22C:         Cached trigger (139): group 0..7; fixed depth 16; read zero
+ *   0x230:         Cache status (140): {error,complete,result_valid,busy}
+ *                 Complete = all 128 channel-major weight words loaded.
+ *                 Cache contents survive INPUT/group changes. Reset and a new
+ *                 preload index invalidate the cache/results. Invalid triggers
+ *                 reject computation and invalidate results. Busy writes ignored.
  *   0x340 - 0x3FC: Packed signed-int8 weight banks 1-3 (indices 208-255)
  *   0x300 - 0x33C: Packed weight alias (16 words, reg indices 192-207)
  *                 Byte 0 -> lane 4*k; bytes sign-extended into legacy storage.
@@ -68,6 +76,14 @@ module my_pw_conv_accel (
     reg [1:0] batch_bank;
     reg batch_busy, batch_done;
     reg [31:0] batch_results [0:3];
+    // 32 channel rows, each 16 signed bytes. Contents need not reset:
+    // validity bitmap prevents use before a complete preload.
+    reg [127:0] cache_rows [0:31];
+    reg [127:0] cache_loaded;
+    reg [7:0] cache_index;
+    reg cache_mode, cache_error;
+    reg [2:0] cache_group;
+    wire [127:0] cache_row = cache_rows[{cache_group,batch_bank}];
     wire [31:0] tree [1:127];
     wire [6:0] active_depth = batch_busy ? batch_depth : depth_reg;
     genvar lane, node;
@@ -75,8 +91,15 @@ module my_pw_conv_accel (
         for (lane = 0; lane < 64; lane = lane + 1) begin: products
             wire signed [7:0] byte_weight = batch_bank == 2'd1 ? batch_weights[lane] :
                 batch_bank == 2'd2 ? batch_weights[64+lane] : batch_weights[128+lane];
-            wire signed [31:0] selected_weight = !batch_busy || batch_bank == 2'd0 ?
+            wire signed [31:0] legacy_weight = !batch_busy || batch_bank == 2'd0 ?
                 weight_buf[lane] : {{24{byte_weight[7]}}, byte_weight};
+            wire signed [31:0] selected_weight;
+            if (lane < 16) begin: cache_lane
+                wire signed [7:0] cw = cache_row[lane*8 +: 8];
+                assign selected_weight = batch_busy && cache_mode ? {{24{cw[7]}},cw} : legacy_weight;
+            end else begin: legacy_lane
+                assign selected_weight = batch_busy && cache_mode ? 32'd0 : legacy_weight;
+            end
             assign tree[64+lane] = lane < active_depth ? input_buf[lane] * selected_weight : 32'd0;
         end
         for (node = 1; node < 64; node = node + 1) begin: reduction
@@ -105,6 +128,8 @@ module my_pw_conv_accel (
             done_reg   <= 1'b0;
             for (i = 0; i < 192; i = i + 1) batch_weights[i] <= 8'sd0;
             for (i = 0; i < 4; i = i + 1) batch_results[i] <= 32'd0;
+            cache_loaded <= 128'd0; cache_index <= 8'd128;
+            cache_mode <= 1'b0; cache_error <= 1'b0; cache_group <= 3'd0;
             batch_depth <= 7'd0;
             batch_bank <= 2'd0;
             batch_busy <= 1'b0;
@@ -141,7 +166,25 @@ module my_pw_conv_accel (
                 // products/addition; the tree is shared with batch mode.
                 result_reg <= tree[1];
                 done_reg   <= 1'b1;
+            end else if (addr == 8'd137) begin
+                cache_index <= wdata < 128 ? wdata[7:0] : 8'd128;
+                cache_loaded <= 128'd0; batch_done <= 1'b0; cache_error <= 1'b0;
+            end else if (addr == 8'd138) begin
+                if (cache_index < 128) begin
+                    cache_rows[cache_index[6:2]][cache_index[1:0]*32 +: 32] <= wdata;
+                    cache_loaded[cache_index[6:0]] <= 1'b1;
+                    cache_index <= cache_index + 8'd1;
+                    batch_done <= 1'b0;
+                end
+            end else if (addr == 8'd139) begin
+                batch_done <= 1'b0;
+                if (wdata < 8 && (&cache_loaded)) begin
+                    cache_mode <= 1'b1; cache_group <= wdata[2:0];
+                    batch_depth <= 7'd16; batch_bank <= 2'd0;
+                    batch_busy <= 1'b1; cache_error <= 1'b0;
+                end else cache_error <= 1'b1;
             end else if (addr == 8'd131) begin
+                cache_mode <= 1'b0;
                 batch_depth <= depth_reg;
                 batch_bank <= 2'd0;
                 batch_busy <= 1'b1;
@@ -175,6 +218,10 @@ module my_pw_conv_accel (
         end else if (addr >= 8'd132 && addr <= 8'd135) begin
             rvalid = resetn && batch_done;
             rdata = rvalid ? batch_results[addr[1:0]] : 32'd0;
+        end else if (addr == 8'd137) begin
+            rdata = {24'd0,cache_index};
+        end else if (addr == 8'd140) begin
+            rdata = {28'd0,cache_error,(&cache_loaded),batch_done,batch_busy};
         end else begin
             rdata = 32'd0;
         end

@@ -13,7 +13,7 @@ module tb_pw_bus;
     wire [7:0] leds;
     wire ser_tx;
     my_soc soc (.clk(clk), .resetn(resetn), .leds(leds), .ser_tx(ser_tx), .ser_rx(1'b1));
-    integer cycles, checks = 0, early_cycles;
+    integer cycles, checks = 0, early_cycles, cached_early_cycles, word_index;
     reg [31:0] value;
 
     task check(input bit condition, input string message);
@@ -91,8 +91,52 @@ module tb_pw_bus;
         @(negedge clk); resetn = 0; request = 0;
         @(negedge clk); resetn = 1;
         access(131, 1, 1); access(135, 0, 0); check(value == 0, "reset and retrigger recover");
+        // Cache registers use the existing 1 KiB decode and normal write ACK.
+        access(139, 1, 0); check(cycles == 2, "incomplete cache trigger ACK");
+        access(140, 0, 0); check(value == 8, "incomplete cache rejects/invalidates trigger");
+        access(137, 1, 0); check(cycles == 2, "cache index normal ACK");
+        for (word_index=0; word_index<128; word_index=word_index+1) begin
+            // Channel c has only weight[0]=c-16; all remaining weights zero.
+            access(138, 1, word_index%4 == 0 ? ((word_index/4-16)&255) : 0);
+            check(cycles == 2, "preload write normal ACK");
+            access(137, 0, 0);
+            check(cycles == 2 && value == word_index+1, "one auto-increment per bus write");
+        end
+        access(138, 0, 0); check(value == 0, "preload port read zero");
+        access(140, 0, 0); check(value == 4, "complete preload status");
+        for (word_index=0; word_index<16; word_index=word_index+1)
+            access(word_index, 1, word_index == 0 ? 5 : 0);
+        access(139, 1, 2); check(cycles == 2, "cached trigger normal ACK");
+        access(132, 0, 0); cached_early_cycles=cycles;
+        check(cycles == 5 && value == -40, "cached early result waits and sign extends");
+        access(135, 0, 0); check(cycles == 2 && value == -25, "cached bank 3 result");
+        access(139, 1, 7);
+        access(135, 0, 0); check(cycles == 5 && value == 75, "cached group change cannot return stale result");
+        access(139, 1, 0); access(137, 1, 0);
+        check(cycles == 2, "busy preload-index write ACK");
+        access(140, 0, 0); check(value == 6, "busy preload-index write ignored");
+        access(137, 0, 0); check(value == 128, "busy index write did not reset pointer");
+        access(132, 0, 0); check(value == -80, "busy write preserves cached arithmetic");
+        access(139, 1, 8); access(140, 0, 0);
+        check(value == 12, "invalid group retains weights but invalidates results");
+        // Rejected triggers must never acknowledge a stale result.
+        @(negedge clk); request=1; address=32'h02000610; strobes=0;
+        repeat (6) begin
+            @(posedge clk); check(!soc.mem_ready, "rejected cached result remains unacknowledged"); #1;
+        end
+        request=0;
+        access(139, 1, 1); access(132, 0, 0);
+        check(cycles == 5 && value == -60, "valid cached trigger recovers after rejection");
+        // Reset aborts a cached computation and invalidates the preload.
+        access(139, 1, 1);
+        @(negedge clk); resetn=0; request=0;
+        @(negedge clk); resetn=1;
+        access(140, 0, 0); check(value == 0, "reset clears cache/batch validity");
+        access(139, 1, 0); access(140, 0, 0); check(value == 8, "reset cache requires preload again");
         $display("[PASS] actual SoC PW decoder/handshake, early reads, legacy timing, busy ACKs, reset");
         $display("[MEASURE] ordinary access: 2 CPU sample edges; early result: %0d; extra stall: %0d cycles", early_cycles, early_cycles-2);
+        $display("[MEASURE] cached early result: %0d sample edges; extra stall: %0d cycles", cached_early_cycles, cached_early_cycles-2);
+        $display("[PASS] cache decode/preload/group, busy ACKs, stale-read stall, reset/rejection recovery");
         $display("ALL PW BUS TESTS PASSED: %0d assertions", checks);
         $finish;
     end

@@ -52,6 +52,22 @@ test_pw_bus:
 	$(IVERILOG) -g2012 -Wall -s tb_pw_bus -o "$$artifact" tb_pw_bus.v $(filter-out tb.v,$(VERILOG_SOURCES)); \
 	$(VVP) "$$artifact"
 
+# Persistent PW1 cache arithmetic and firmware trace equivalence.
+test_pw_cache:
+	@set -eu; artifact=$$(mktemp /tmp/tb_pw_cache.XXXXXX); \
+	trap 'rm -f "$$artifact"' EXIT HUP INT TERM; \
+	$(IVERILOG) -g2012 -Wall -s tb_pw_cache -o "$$artifact" tb_pw_cache.v my_pw_conv_accel.v; \
+	$(VVP) "$$artifact"
+
+verify_pw_firmware:
+	@set -eu; artifact=$$(mktemp /tmp/verify_pw_firmware.XXXXXX); \
+	trap 'rm -f "$$artifact"' EXIT HUP INT TERM; \
+	cc -O2 -fwrapv verify_pw_firmware.c quantize.c tinymobilenet_model_data.c -o "$$artifact"; \
+	"$$artifact"
+
+verify_pw_cache:
+	python3 -B verify_pw_cache.py
+
 # Training pipeline targets
 train:
 	python3 train_model.py
@@ -69,4 +85,4 @@ pipeline: train generate extract_test sim
 clean:
 	rm -f firmware.elf firmware.hex sim.vvp
 
-.PHONY: all sim clean train generate extract_test pipeline test_pw test_pw_batch test_pw_bus
+.PHONY: all sim clean train generate extract_test pipeline test_pw test_pw_batch test_pw_bus test_pw_cache verify_pw_firmware verify_pw_cache

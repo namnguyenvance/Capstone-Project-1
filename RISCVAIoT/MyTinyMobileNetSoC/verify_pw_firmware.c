@@ -1,20 +1,24 @@
 /* Host verification of the actual hardware PW path and its dispatch.
  * No NATIVE_RUN: MMIO is intercepted, while production arithmetic is retained.
- * Build: cc -O2 verify_pw_firmware.c quantize.c -o /tmp/verify_pw_firmware
+ * Build: make verify_pw_firmware (artifacts remain in /tmp)
  */
 #define PW_MMIO_TEST
 #include "dl_ops.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "tinymobilenet_model_data.h"
+#include "mnist_test_images.h"
 
 struct transaction { uintptr_t address; int32_t value; int write; };
-static struct transaction trace[8192], baseline[8192];
+static struct transaction trace[600000], baseline[600000];
 static size_t trace_count, physical_count, packed_count, scalar_weight_count;
 static size_t total_physical, total_packed, batch_count, single_count;
 static size_t total_batches, total_singles, total_level2_physical;
 static int32_t extra_weights[3][64], captured[4][64], batch_results[4];
 static int batch_busy, batch_valid;
+static int8_t resident[512];
+static unsigned preload_index, preload_writes, cached_triggers;
 static int32_t in[64], weight[64], depth, result, raw, multiplier, shift, quant;
 static uint32_t random_state = 0x51a7c0de;
 static unsigned cases, comparisons, clamp_hits[2], shift_hits[2], boundary_hits[2];
@@ -31,6 +35,28 @@ void pw_mmio_write(volatile int32_t *reg, int32_t value) {
     uintptr_t address = (uintptr_t)reg;
     ++physical_count;
     if (address >= 0x02000400 && address < 0x02000800 && batch_busy) abort();
+    if (address == 0x02000624) {
+        preload_index=(unsigned)value; preload_writes=0; batch_valid=0; return;
+    }
+    if (address == 0x02000628) {
+        if (preload_index>=128) abort();
+        for (unsigned byte=0;byte<4;++byte)
+            resident[4*preload_index+byte]=(int8_t)((uint32_t)value>>(8*byte));
+        ++preload_index; ++preload_writes; batch_valid=0; return;
+    }
+    if (address == 0x0200062c) {
+        if ((unsigned)value>=8 || preload_writes!=128 || depth!=16) abort();
+        ++cached_triggers; ++batch_count; batch_busy=1; batch_valid=0;
+        for (unsigned bank=0;bank<4;++bank) {
+            int64_t sum=0;
+            for (unsigned i=0;i<16;++i) {
+                int32_t w=resident[((unsigned)value*4+bank)*16+i];
+                captured[bank][i]=w; sum+=(int64_t)in[i]*w;
+            }
+            batch_results[bank]=(int32_t)(uint32_t)sum;
+        }
+        return;
+    }
     if (address >= 0x02000700 && address <= 0x020007fc) {
         unsigned bank = (unsigned)((address - 0x02000700) / 64);
         unsigned lane = (unsigned)((address - 0x02000700) % 64) / 4 * 4;
@@ -74,7 +100,7 @@ void pw_mmio_write(volatile int32_t *reg, int32_t value) {
         record(address,value,1);
         if (shift < 0 || shift > 30) abort();
         int64_t product = (int64_t)raw*multiplier;
-        int64_t high = arithmetic_right(product + (product >= 0 ?
+        int32_t high = (int32_t)(uint32_t)arithmetic_right(product + (product >= 0 ?
             INT64_C(1073741824) : -INT64_C(1073741823)), 31);
         uint32_t mask = (UINT32_C(1) << shift)-1;
         uint32_t remainder = (uint32_t)high & mask;
@@ -150,10 +176,102 @@ static void reset_model(void) {
     memset(in,0,sizeof in); memset(weight,0,sizeof weight);
     memset(extra_weights,0,sizeof extra_weights); memset(captured,0,sizeof captured);
     memset(batch_results,0,sizeof batch_results);
+    memset(resident,0,sizeof resident); preload_index=preload_writes=cached_triggers=0;
     batch_busy=batch_valid=0; batch_count=single_count=0;
     depth=result=raw=multiplier=shift=quant=0; trace_count=physical_count=packed_count=scalar_weight_count=0;
 }
-int main(void) {
+
+/* Independent per-pixel Conv0/DW1 reference with current hardware rounding.
+ * Reconstruct the actual first-image PW1 input without external captured files. */
+static int32_t reference_scale(int32_t acc, int32_t m, int8_t sh) {
+    if (sh<0) acc=(int32_t)((uint32_t)acc << -sh);
+    unsigned right=sh<0 ? 0 : (unsigned)sh;
+    int64_t product=(int64_t)acc*m;
+    int32_t hi=(int32_t)(uint32_t)arithmetic_right(product+
+        (product>=0 ? INT64_C(1073741824) : -INT64_C(1073741823)),31);
+    uint32_t mask=(UINT32_C(1)<<right)-1;
+    return (int32_t)(arithmetic_right(hi,right)+(((uint32_t)hi&mask)>((mask>>1)+(hi<0))));
+}
+static int8_t reference_finish(int32_t acc,int32_t m,int8_t shift,int32_t offset) {
+    acc=(int32_t)((uint32_t)reference_scale(acc,m,shift)+(uint32_t)offset);
+    if (acc<-128) acc=-128;
+    if (acc>127) acc=127;
+    return (int8_t)acc;
+}
+static void save_tensor(const char *,const char *,const int8_t *,size_t);
+static void first_image_pw1_input(int8_t *out,const char *artifacts) {
+    int8_t conv[16*784];
+    for (int c=0;c<16;++c) for (int y=0;y<28;++y) for (int x=0;x<28;++x) {
+        uint32_t sum=(uint32_t)tmn_conv0_bias_data[c];
+        for (int ky=0;ky<3;++ky) for (int kx=0;kx<3;++kx) {
+            int iy=y+ky-1,ix=x+kx-1;
+            if (iy>=0 && iy<28 && ix>=0 && ix<28)
+                sum+=(uint32_t)((int64_t)(test_images[0][iy*28+ix]+tmn_conv0_input_offset)*tmn_conv0_kernel_data[c*9+ky*3+kx]);
+        }
+        conv[c*784+y*28+x]=reference_finish((int32_t)sum,tmn_conv0_output_multiplier[c],tmn_conv0_output_shift[c],tmn_conv0_output_offset);
+    }
+    save_tensor(artifacts,"Conv0_output.bin",conv,sizeof conv);
+    for (int c=0;c<16;++c) for (int y=0;y<28;++y) for (int x=0;x<28;++x) {
+        uint32_t sum=(uint32_t)tmn_dw1_bias_data[c];
+        for (int ky=0;ky<3;++ky) for (int kx=0;kx<3;++kx) {
+            int iy=y+ky-1,ix=x+kx-1;
+            if (iy>=0 && iy<28 && ix>=0 && ix<28)
+                sum+=(uint32_t)((int64_t)(conv[c*784+iy*28+ix]+tmn_dw1_input_offset)*tmn_dw1_kernel_data[c*9+ky*3+kx]);
+        }
+        out[c*784+y*28+x]=reference_finish((int32_t)sum,tmn_dw1_output_multiplier[c],tmn_dw1_output_shift[c],tmn_dw1_output_offset);
+    }
+}
+static void save_tensor(const char *directory,const char *name,const int8_t *data,size_t size) {
+    if (!directory) return;
+    char path[1024]; if (snprintf(path,sizeof path,"%s/%s",directory,name)>=(int)sizeof path) abort();
+    FILE *f=fopen(path,"wb"); if (!f || fwrite(data,1,size,f)!=size || fclose(f)) abort();
+}
+static void test_pw1_cache(const char *artifacts) {
+    static int8_t input[16*784], filters_buf[516], expected[32*784], actual[32*784];
+    int32_t biases[32], multipliers[32]; int8_t shifts[32];
+    int dims[3]={28,28,16}, fd[3]={1,1,16}, od[3]={28,28,32}, bd[1]={32};
+    for (int trial=0;trial<40;++trial) {
+        int8_t *filters=filters_buf+trial%4;
+        int32_t offset=trial==1 ? INT32_MAX : trial==2 ? INT32_MIN : trial%3==0 ? 128 : -17;
+        int32_t out_offset=trial%2 ? -128 : 7;
+        int low=trial%3==0 ? -10 : -128, high=trial%3==0 ? 10 : 127;
+        for (int i=0;i<16*784;++i) input[i]=(int8_t)next_random();
+        for (int i=0;i<512;++i) filters[i]=trial<4 ? (int8_t[]){-128,-1,0,127}[i%4] : (int8_t)next_random();
+        if (trial==3) memset(input,0,sizeof input);
+        if (trial==4) memset(filters,0,512);
+        for (int c=0;c<32;++c) {
+            biases[c]=(int32_t)next_random();
+            multipliers[c]=trial<3 && c%3==0 ? INT32_MIN : (int32_t)(next_random()&0x7fffffff);
+            shifts[c]=c%2 ? -3 : 4;
+        }
+        const int32_t *bias=trial%2 ? biases : NULL;
+        if (!trial) {
+            first_image_pw1_input(input,artifacts);
+            memcpy(filters,tmn_pw1_kernel_data,512); memcpy(biases,tmn_pw1_bias_data,sizeof biases);
+            memcpy(multipliers,tmn_pw1_output_multiplier,sizeof multipliers); memcpy(shifts,tmn_pw1_output_shift,sizeof shifts);
+            bias=biases; offset=tmn_pw1_input_offset; out_offset=tmn_pw1_output_offset; low=-128; high=127;
+            save_tensor(artifacts,"PW1_input.bin",input,sizeof input);
+        }
+        reset_model();
+        Conv2DLevel4(input,dims,offset,filters,fd,bias,bd,1,1,0,0,expected,od,out_offset,multipliers,shifts,low,high);
+        size_t n=trace_count, old_physical=physical_count;
+        memcpy(baseline,trace,n*sizeof *trace);
+        if (old_physical!=269697 || packed_count!=100352 || batch_count!=6272) abort();
+        reset_model();
+        Conv2D_TFLM(input,dims,offset,filters,fd,bias,bd,1,1,0,0,actual,od,out_offset,multipliers,shifts,low,high);
+        if (memcmp(expected,actual,sizeof actual) || n!=trace_count || preload_writes!=128 ||
+            packed_count || scalar_weight_count || cached_triggers!=6272 || physical_count!=169474) abort();
+        for (size_t i=0;i<n;++i)
+            if (baseline[i].address!=trace[i].address || baseline[i].value!=trace[i].value || baseline[i].write!=trace[i].write) abort();
+        if (!trial) {
+            save_tensor(artifacts,"PW1_output.bin",actual,sizeof actual);
+            printf("[PASS] actual first-image PW1 tensor: 25088 bytes; MMIO 269697 -> 169474\n");
+        }
+    }
+    printf("[PASS] PW1 cache: 40 complete tensors, ordered logical PW/quantizer traces, signed/wrap/offset/bias/clamp/shift/alignment/random\n");
+}
+
+int main(int argc, char **argv) {
     const int depths[] = {1,16,32,48,64,3,17,63};
     int8_t input[64*6], filter_storage[64*9+4], expected[6*9], actual[6*9], shifts[9];
     int32_t biases[9], multipliers[9];
@@ -232,10 +350,12 @@ int main(void) {
         printf("[PASS] firmware PW depth %d: outputs and ordered PW/quantizer trace\n",d);
     }
     if (!clamp_hits[0] || !clamp_hits[1] || !shift_hits[0] || !shift_hits[1] || !boundary_hits[0] || !boundary_hits[1]) abort();
-    printf("ALL FIRMWARE PW TESTS PASSED: %u cases, %u transactions; both clamp boundaries and shift signs covered\n",
+    printf("LEGACY FIRMWARE PW TESTS PASSED: %u cases, %u transactions; both clamp boundaries and shift signs covered\n",
         cases,comparisons);
     printf("Physical MMIO: Level 2 %zu; batch %zu; saved %zu; packed writes %zu\n",
         total_level2_physical,total_physical,total_level2_physical-total_physical,total_packed);
     printf("Batch triggers: %zu; legacy tail triggers: %zu\n",total_batches,total_singles);
+    test_pw1_cache(argc>1 ? argv[1] : NULL);
+    printf("ALL FIRMWARE PW TESTS PASSED: %u legacy cases + 40 full cached PW1 cases\n", cases);
     return 0;
 }

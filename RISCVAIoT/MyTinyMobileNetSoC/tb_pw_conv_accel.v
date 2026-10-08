@@ -167,8 +167,9 @@ module tb_pw_conv_accel;
         @(negedge clk); check_reg(0, 32'h80000000);
         write_reg(130, 32'hffffffff); check_reg(130, 0);
         for (i = 131; i < 256; i = i + 1) begin
-            if (i >= 137 && i < 192) write_reg(i, 32'hffffffff);
-            check_reg(i, 0);
+            // Indices 137..140 now belong to the resident PW1 cache.
+            if (i > 140 && i < 192) write_reg(i, 32'hffffffff);
+            if (i < 137 || i > 140) check_reg(i, 0);
         end
         check_reg(128, 48); check_reg(130, 0);
         $display("[PASS] register addressing");
