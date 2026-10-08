@@ -211,6 +211,53 @@ static __attribute__((noinline)) void CachedPW1Hardware(
     }
 }
 #endif
+
+#ifndef NATIVE_RUN
+/* Exact Conv0 shape: retain each input patch across all output channels. */
+static __attribute__((noinline)) void TileConv0Hardware(
+    const int8_t *input, const int8_t *weights, int8_t *output,
+    const struct CacheContext *ctx
+) {
+    for (int ty = 0; ty < 28; ty += 3) {
+        for (int tx = 0; tx < 28; tx += 3) {
+            for (int iy = 0; iy < 5; ++iy) {
+                for (int ix = 0; ix < 5; ++ix) {
+                    int y = ty - 1 + iy, x = tx - 1 + ix;
+                    int32_t value = 0;
+                    /* Padding is literal zero; apply the offset only to valid input. */
+                    if ((unsigned)y < 28 && (unsigned)x < 28)
+                        value = (int32_t)((uint32_t)(int32_t)input[y * 28 + x]
+                            + (uint32_t)ctx->input_offset);
+                    PW_WRITE(CONV_ACCEL_IMG + iy * 5 + ix, value);
+                }
+            }
+
+            int rows = ty + 3 <= 28 ? 3 : 28 - ty;
+            int cols = tx + 3 <= 28 ? 3 : 28 - tx;
+            for (int oc = 0; oc < 16; ++oc) {
+                for (int k = 0; k < 9; ++k)
+                    PW_WRITE(CONV_ACCEL_KER + k, (int32_t)weights[oc * 9 + k]);
+                PW_WRITE(CONV_ACCEL_CTRL, 1);
+
+                /* Boundary tiles read and store only valid outputs. */
+                for (int y = 0; y < rows; ++y) {
+                    for (int x = 0; x < cols; ++x) {
+                        int32_t acc = PW_READ(CONV_ACCEL_OUT + y * 3 + x);
+                        if (ctx->bias_data)
+                            acc = (int32_t)((uint32_t)acc + (uint32_t)ctx->bias_data[oc]);
+                        acc = MultiplyByQuantizedMultiplier(
+                            acc, ctx->output_multiplier[oc], ctx->output_shift[oc]);
+                        acc = (int32_t)((uint32_t)acc + (uint32_t)ctx->output_offset);
+                        acc = acc < ctx->output_activation_min ? ctx->output_activation_min : acc;
+                        acc = acc > ctx->output_activation_max ? ctx->output_activation_max : acc;
+                        output[oc * 784 + (ty + y) * 28 + tx + x] = (int8_t)acc;
+                    }
+                }
+            }
+        }
+    }
+}
+#endif
 #ifndef NATIVE_RUN
 /* Keep the verified Level 4 body behind an independent compiler boundary. */
 static __attribute__((noinline,noipa)) void Conv2DLevel4(
@@ -518,6 +565,18 @@ void Conv2D_TFLM(
             output_shift, output_activation_min, output_activation_max
         };
         CachedPW1Hardware(input_data, filter_data, output_data, &ctx);
+        return;
+    }
+    /* Exact Conv0 only; keep generic and cached PW paths independent. */
+    if (input_dims[0] == 28 && input_dims[1] == 28 && input_dims[2] == 1 &&
+        output_dims[0] == 28 && output_dims[1] == 28 && output_dims[2] == 16 &&
+        filter_dims[0] == 3 && filter_dims[1] == 3 && filter_dims[2] == 1 &&
+        stride_width == 1 && stride_height == 1 && pad_width == 1 && pad_height == 1) {
+        const struct CacheContext ctx = {
+            input_offset, bias_data, output_offset, output_multiplier,
+            output_shift, output_activation_min, output_activation_max
+        };
+        TileConv0Hardware(input_data, filter_data, output_data, &ctx);
         return;
     }
     Conv2DLevel4(input_data, input_dims, input_offset, filter_data, filter_dims,
