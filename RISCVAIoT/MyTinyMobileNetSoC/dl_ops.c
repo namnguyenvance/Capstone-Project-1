@@ -390,6 +390,61 @@ void Conv2D_TFLM(
 }
 
 
+#ifndef NATIVE_RUN
+/* Isolate software tap-loop temporaries from the DW hardware paths. */
+static __attribute__((noinline)) void DWStride2CPU(
+    const int8_t *input_data, const int *input_dims, int32_t input_offset,
+    const int8_t *filter_data, const int32_t *bias_data,
+    int pad_width, int pad_height,
+    int8_t *output_data, const int *output_dims, int32_t output_offset,
+    const int32_t *output_multiplier, const int8_t *output_shift,
+    int32_t output_activation_min, int32_t output_activation_max
+) {
+    const int input_depth = input_dims[2];
+    const int input_height = input_dims[1];
+    const int input_width = input_dims[0];
+    const int output_height = output_dims[1];
+    const int output_width = output_dims[0];
+    /* Highly optimized software path for stride-2 Depthwise Convolution */
+    const int in_ch_size = input_height * input_width;
+    const int out_ch_size = output_height * output_width;
+
+    for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
+        const int8_t* in_ptr = &input_data[in_channel * in_ch_size];
+        int8_t* out_ptr = &output_data[in_channel * out_ch_size];
+        const int8_t* filter_ptr = &filter_data[in_channel * 9];
+        int32_t bias = bias_data ? bias_data[in_channel] : 0;
+
+        for (int out_y = 0; out_y < output_height; ++out_y) {
+            const int in_y_origin = (out_y * 2) - pad_height;
+            for (int out_x = 0; out_x < output_width; ++out_x) {
+                const int in_x_origin = (out_x * 2) - pad_width;
+                int32_t acc = bias;
+
+                for (int fy = 0; fy < 3; ++fy) {
+                    const int in_y = in_y_origin + fy;
+                    if (in_y >= 0 && in_y < input_height) {
+                        for (int fx = 0; fx < 3; ++fx) {
+                            const int in_x = in_x_origin + fx;
+                            if (in_x >= 0 && in_x < input_width) {
+                                acc += filter_ptr[fy * 3 + fx] * (in_ptr[in_y * input_width + in_x] + input_offset);
+                            }
+                        }
+                    }
+                }
+
+                acc = MultiplyByQuantizedMultiplier(acc, output_multiplier[in_channel], output_shift[in_channel]);
+                acc += output_offset;
+                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                acc = (acc > output_activation_max) ? output_activation_max : acc;
+                out_ptr[out_y * output_width + out_x] = (int8_t)acc;
+            }
+        }
+    }
+}
+
+#endif
+
 /* ========================================================================
  * Depthwise 2D Convolution (DepthwiseConv2D_TFLM)
  * 
@@ -401,8 +456,8 @@ void Conv2D_TFLM(
  * This means each filter only operates on a SINGLE input channel,
  * making it much cheaper computationally.
  *
- * Uses the DW conv accelerator for 3x3 stride-1 case,
- * falls back to software for stride-2 case.
+ * Uses the DW accelerator for 3x3 stride 1 and the exact DW2 stride-2 shape.
+ * Other stride-2 shapes retain the software fallback.
  * ======================================================================== */
 void DepthwiseConv2D_TFLM(
     const int8_t* input_data , const int* input_dims , int32_t input_offset,
@@ -497,43 +552,75 @@ void DepthwiseConv2D_TFLM(
                 }
             }
         }
-    } else if (filter_width == 3 && filter_height == 3 && stride_width == 2 && stride_height == 2 && depth_multiplier == 1) {
-        /* Highly optimized software path for stride-2 Depthwise Convolution */
-        const int in_ch_size = input_height * input_width;
-        const int out_ch_size = output_height * output_width;
-        
+    } else if (filter_width == 3 && filter_height == 3 && stride_width == 2 && stride_height == 2 && depth_multiplier == 1
+            && input_width == 28 && input_height == 28 && input_depth == 32
+            && output_width == 14 && output_height == 14 && output_depth == 32) {
         for (int in_channel = 0; in_channel < input_depth; ++in_channel) {
-            const int8_t* in_ptr = &input_data[in_channel * in_ch_size];
-            int8_t* out_ptr = &output_data[in_channel * out_ch_size];
-            const int8_t* filter_ptr = &filter_data[in_channel * 9];
-            int32_t bias = bias_data ? bias_data[in_channel] : 0;
-            
-            for (int out_y = 0; out_y < output_height; ++out_y) {
-                const int in_y_origin = (out_y * 2) - pad_height;
-                for (int out_x = 0; out_x < output_width; ++out_x) {
-                    const int in_x_origin = (out_x * 2) - pad_width;
-                    int32_t acc = bias;
-                    
-                    for (int fy = 0; fy < 3; ++fy) {
-                        const int in_y = in_y_origin + fy;
-                        if (in_y >= 0 && in_y < input_height) {
-                            for (int fx = 0; fx < 3; ++fx) {
-                                const int in_x = in_x_origin + fx;
-                                if (in_x >= 0 && in_x < input_width) {
-                                    acc += filter_ptr[fy * 3 + fx] * (in_ptr[in_y * input_width + in_x] + input_offset);
-                                }
+            int out_channel = in_channel; /* depth_multiplier == 1 */
+
+            /* Load kernel for this single channel (9 values) */
+            for (int ky = 0; ky < 3; ++ky) {
+                for (int kx = 0; kx < 3; ++kx) {
+                    DW_CONV_ACCEL_KER[ky * 3 + kx] = filter_data[
+                        in_channel * 9 + ky * 3 + kx];
+                }
+            }
+
+            /* DW2: four stride-2 outputs share one 5x5 patch */
+            for (int out_y = 0; out_y < output_height; out_y += 2) {
+                for (int out_x = 0; out_x < output_width; out_x += 2) {
+
+                    /* Load 5x5 input tile for this channel */
+                    const int in_x_origin = out_x * 2 - pad_width;
+                    const int in_y_origin = out_y * 2 - pad_height;
+
+                    for (int iy = 0; iy < 5; ++iy) {
+                        for (int ix = 0; ix < 5; ++ix) {
+                            const int in_x = in_x_origin + ix;
+                            const int in_y = in_y_origin + iy;
+                            int32_t val = 0;
+                            if ((in_x >= 0) && (in_x < input_width)
+                             && (in_y >= 0) && (in_y < input_height)) {
+                                val = (int32_t)((uint32_t)(int32_t)input_data[
+                                    in_channel * input_height * input_width +
+                                    in_y * input_width + in_x] + (uint32_t)input_offset);
+                            }
+                            DW_CONV_ACCEL_IMG[iy * 5 + ix] = val;
+                        }
+                    }
+
+                    /* Trigger computation */
+                    DW_CONV_ACCEL_CTRL[0] = 1;
+
+                    /* Read corners 0, 2, 6, 8; preserve per-output postprocessing */
+                    for (int i = 0; i < 2; ++i) {
+                        for (int j = 0; j < 2; ++j) {
+                            if ((out_y + i) < output_height && (out_x + j) < output_width) {
+                                int32_t acc = DW_CONV_ACCEL_OUT[i * 6 + j * 2];
+
+                                /* Add bias (this is the ONLY accumulation — no cross-channel!) */
+                                if (bias_data) acc = (int32_t)((uint32_t)acc + (uint32_t)bias_data[out_channel]);
+
+                                acc = MultiplyByQuantizedMultiplier(
+                                    acc, output_multiplier[out_channel], output_shift[out_channel]);
+
+                                acc = (int32_t)((uint32_t)acc + (uint32_t)output_offset);
+                                acc = (acc < output_activation_min) ? output_activation_min : acc;
+                                acc = (acc > output_activation_max) ? output_activation_max : acc;
+
+                                output_data[out_channel * output_height * output_width +
+                                            (out_y + i) * output_width + (out_x + j)] = (int8_t)acc;
                             }
                         }
                     }
-                    
-                    acc = MultiplyByQuantizedMultiplier(acc, output_multiplier[in_channel], output_shift[in_channel]);
-                    acc += output_offset;
-                    acc = (acc < output_activation_min) ? output_activation_min : acc;
-                    acc = (acc > output_activation_max) ? output_activation_max : acc;
-                    out_ptr[out_y * output_width + out_x] = (int8_t)acc;
                 }
             }
         }
+    } else if (filter_width == 3 && filter_height == 3 && stride_width == 2 && stride_height == 2 && depth_multiplier == 1) {
+        DWStride2CPU(input_data, input_dims, input_offset, filter_data, bias_data,
+                     pad_width, pad_height, output_data, output_dims, output_offset,
+                     output_multiplier, output_shift,
+                     output_activation_min, output_activation_max);
     } else 
 #endif
     {
