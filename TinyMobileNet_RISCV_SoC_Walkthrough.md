@@ -850,7 +850,7 @@ Score cao nhất = **115** tại index **7** → Dự đoán đúng chữ số *
 | Sim Wall Time (Icarus Verilog) | ~20 minutes |
 | Sim Time Units | 1,243,418,010,000 ps |
 
-### 9.6 Verified Level 1, Level 2 và Level 3 PW Optimizations
+### 9.6 Verified Level 1–4 Optimizations
 
 Các kết quả dưới đây được xác nhận bằng integrated SoC simulation với cùng flow build/simulation. **Cycle count là metric hiệu năng chính**; total bao gồm UART output giữa các layer, nên không bằng tổng cycle của riêng các layer. Wall-clock runtime của Icarus phụ thuộc máy chạy và không phải architectural speedup.
 
@@ -860,6 +860,7 @@ Các kết quả dưới đây được xác nhận bằng integrated SoC simula
 | Level 1 | 55,395,889 | 10.76% | 10.76% | 1.1205× |
 | Level 2 | 46,579,875 | 24.96% | 15.91% | 1.333× |
 | Level 3 batch-4 | 44,156,359 | 28.86% | 5.20% | 1.4057× |
+| Level 4 DW2 reuse / CPU codegen | 36,208,913 | 41.67% | 18.00% | 1.7143× |
 
 | PW layer | Baseline cycles | Level 1 cycles | Level 2 cycles | Level 2 savings vs Level 1 | Level 2 savings vs baseline |
 |----------|----------------:|---------------:|---------------:|--------------------------:|---------------------------:|
@@ -893,9 +894,30 @@ Integrated Level 3 inference tiết kiệm **2,423,516 cycles (5.20%) so với L
 
 **Non-PW timings:** Level 1 giữ nguyên toàn bộ non-PW cycles so với baseline. Level 2 chỉ thay đổi Conv0 từ **7,738,739** xuống **7,712,627** cycles (giảm **26,112**, **0.337%**) do compiler code generation. Level 3 Conv0 tăng lên **7,775,776** cycles: regression **+63,149 cycles (+0.819%) so với Level 2**, vượt ngưỡng 0.5%. Assembly có frame **208→224 bytes** và thêm 2 row-setup stack stores, phù hợp với compiler-codegen regression đã quan sát. DW1 (**6,658,976**), DW2 (**10,869,269**), DW3 (**3,990,023**), GAP (**187,380**) và FC (**50,824**) đều không đổi. Total savings đã bao gồm Conv0 regression và inter-layer UART overhead.
 
-**Correctness:** Cả bốn phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Level 3 cũng pass standalone prototype, `make test_pw_batch`, `make test_pw_bus`, batch firmware equivalence và RTL lint. Integrated simulation xác nhận scores và prediction không thay đổi.
+**Level 4 — DW2 stride-2 reuse:** Firmware dùng lại DW accelerator hiện có cho đúng shape DW2: input **28×28×32**, output **14×14×32**, kernel 3×3, stride 2 và depth multiplier 1. Một patch **5×5** tạo bốn stride-2 outputs bằng cách đọc các result indices **0, 2, 6, 8**, tương ứng tile output **2×2**. Kernel được load **một lần mỗi channel**; mỗi tile load patch, trigger một lần, rồi giữ nguyên bias → quantization → output offset → clamp → CHW store. Source bounds được kiểm tra trước khi đọc input; padding là **literal zero**, không cộng `input_offset` vào padding. **Không cần thay đổi RTL và không thêm FPGA resources.**
 
-Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của PW optimization.
+Generic stride-2 CPU fallback được chuyển vào static **`noinline` helper `DWStride2CPU`**, giữ nguyên thuật toán và arithmetic. Việc tách source này cải thiện register allocation/code generation cho DW1/DW3. **DW3 vẫn CPU-only**, không dùng DW accelerator: valid-tap loop giảm từ 19 instructions ở Level 3 (23 ở candidate inline ban đầu) xuống 14, không còn stack accesses trong tap loop. DW2 giữ hardware path inline; native fallback và unsupported shapes được bảo toàn.
+
+| Layer | Verified Level 3 cycles | Verified Level 4 cycles | Savings vs Level 3 |
+|-------|------------------------:|------------------------:|-------------------:|
+| Conv0 | 7,775,776 | 7,775,776 | 0 |
+| DW1 | 6,658,976 | 6,421,895 | 237,081 (3.56%) |
+| PW1 | 8,393,456 | 8,393,456 | 0 |
+| DW2 | 10,869,269 | 3,994,547 | 6,874,722 (63.25%) |
+| PW2 | 4,286,581 | 4,286,581 | 0 |
+| DW3 | 3,990,023 | 3,155,797 | 834,226 (20.91%) |
+| PW3 | 1,810,193 | 1,810,193 | 0 |
+| GAP | 187,380 | 187,380 | 0 |
+| FC | 50,824 | 50,824 | 0 |
+| **Total inference** | **44,156,359** | **36,208,913** | **7,947,446 (18.00%)** |
+
+Level 4 tiết kiệm **25,862,974 cycles (41.67%) so với original baseline 62,071,887**, đạt **1.7143× architectural speedup**. Conv0, mọi PW layer, GAP và FC đều cycle-identical so với Level 3. Tổng savings có thêm **1,417 cycles** ngoài các layer measurements; total bao gồm caller/setup và inter-layer UART output. Wall-clock simulation time là **19m 29.465s**, exit status **0**; **architectural speedup dùng cycle counts, không dùng wall-clock time**.
+
+Level 4 focused verification pass: 121 DW2 tensor cases (actual output byte-for-byte, signed edges, offsets, padding, nullable bias, cả hai shift signs, clamps, seeded random và wraparound), 24 CPU-fallback cases cho DW3/unsupported shapes, sanitizer checks, unchanged DW RTL mapping tests và compiled RV32IM wraparound checks. Native verifier giữ kết quả **95/100**, firmware rebuild và `git diff --check` pass. Integrated simulation xác nhận score vector bit-exact và prediction không đổi.
+
+**Correctness:** Cả năm phiên bản có score vector bit-exact `[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]`, predicted class **7**, expected label **7**. RESULT → bias → quantization → output offset → clamp order được giữ nguyên. Quick verification đã pass: `make test_pw`, PW firmware MMIO trace/equivalence harness (Level 2 packed writes được normalize thành 4 logical legacy lane writes; quantizer traces giống nhau), native verifier và firmware rebuild. Level 3 cũng pass standalone prototype, `make test_pw_batch`, `make test_pw_bus`, batch firmware equivalence và RTL lint. Integrated simulation xác nhận scores và prediction không thay đổi.
+
+Final LED vẫn là **0xFF**: firmware chạy một image nhưng so sánh số correct với **100**, nên báo `1/100` và PARTIAL dù image đó được dự đoán đúng. Đây là vấn đề reporting đã biết, không phải regression của các optimization Level 1–4.
 
 ---
 
