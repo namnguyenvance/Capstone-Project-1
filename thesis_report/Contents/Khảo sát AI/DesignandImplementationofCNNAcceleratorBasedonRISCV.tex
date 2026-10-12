@@ -1,0 +1,75 @@
+\subsection{Design and Implementation of Convolutional Neural Network Accelerator Based on RISCV}
+\subsubsection{Phân tích tăng tốc mạng nơ-ron tích chập}
+Trong mạng nơ-ron tích chập, hoạt động tốn thời gian nhất là hoạt động tích chập, chiếm gần 90\% thời gian của mạng nơ-ron. Do đó, việc nghiên cứu tăng tốc mạng nơ-ron tích chập chủ yếu tập trung vào việc tăng tốc hoạt động tích chập.\\
+Một số phương pháp tăng tốc phép tích chập:
+\begin{itemize}
+    \item Thay đổi thứ tự lồng vòng lặp: Hoàn thành tính toán tải một lần, cải thiện tỷ lệ sử dụng lại dữ liệu và giảm số lần truy cập bộ nhớ.
+    \item Mở rộng vòng lặp: Sử dụng dữ liệu cơ bản độc lập với nhau, thực hiện tính toán song song.
+\end{itemize}
+\paragraph{Cây cộng - Addition tree}
+Kiến trúc của addition tree được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/addition_tree.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Kiến trúc của cây cộng}
+\end{figure}
+\begin{itemize}
+    \item Là một phương pháp tăng tốc phần cứng điển hình cho việc mở rộng vòng lặp.
+    \item Mở rộng nhân tích chập và thực hiện 8 phép tích chập của 4 nhân tích chập cùng một lúc.
+    \item Giảm vòng lặp kép bằng cách tăng đơn vị tính toán, tốc độ tăng tốc lý thuyết là 8.
+    \item Nhược điểm: tăng nhu cầu về tài nguyên phần cứng, dữ liệu không được sử dụng đầy đủ do tính toán song song, cần tải lại sau mỗi lần chạy, tăng yêu cầu băng thông.
+\end{itemize}
+\paragraph{Tối ưu hóa GEMM - General Matrix Multiplication}
+\begin{itemize}
+    \item Chia đầu ra thành các khối con 4x4 để cải thiện việc sử dụng lại dữ liệu.
+    \item Tối ưu hóa bằng cách sử dụng một số lượng lớn thanh ghi, giảm truy cập bộ nhớ, loại bỏ tính toán con trỏ, sắp xếp lại bộ nhớ để làm cho địa chỉ liên tục.
+    \item Đạt được hiệu suất cải thiện 7 lần.
+\end{itemize}
+\paragraph{Mảng systolic - Systolic Array}
+Kiến trúc của mảng systolic được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/systolic_array.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Kiến trúc của mảng systolic}
+\end{figure}
+\begin{itemize}
+    \item Trọng số được cố định trong mỗi đơn vị tính toán cơ bản, dữ liệu đầu vào chảy qua mỗi đơn vị tính toán, đạt được mục đích sử dụng lại dữ liệu đầu vào.
+    \item Mảng systolic với trọng số cố định yêu cầu K2 phép nhân và K2-1 phép cộng để tính toán một nhân tích chập có kích thước K.
+    \item Giảm đáng kể số chu kỳ cần thiết để thực hiện hoạt động tích chập.
+\end{itemize}
+\subsubsection{Thiết kế bộ tăng tốc}
+\textbf{Phương pháp}: Bộ tăng tốc mạng nơ-ron tích chập được thiết kế trong bài sử dụng phương pháp mảng systolic cố định trọng số được tối ưu hóa GEMM, kết hợp tối ưu hóa GEMM với mảng systolic cố định trọng số.\\
+Kiến trúc tổng quát của bộ tăng tốc được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[height=6.3cm,width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/accelerator_architecture.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Kiến trúc tổng quát của hệ thống}
+\end{figure}
+\begin{itemize}
+    \item Bao gồm bộ tăng tốc được kết nối với RocketCore thông qua ROCC.
+    \item Bộ tăng tốc truy cập L2Cache và Dram thông qua mô-đun DMA để đọc và ghi lại dữ liệu bản đồ đặc trưng.
+    \item Bộ tăng tốc bao gồm ba phần: mô-đun điều khiển, mô-đun tính toán và mô-đun bộ nhớ cache.
+\end{itemize}
+Mô-đun tính toán ma trận được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/matrix_mul.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Mô-đun tính toán ma trận}
+\end{figure}
+\begin{itemize}
+    \item Đơn vị số học cơ bản PE chịu trách nhiệm hoàn thành phép nhân và cộng đơn giản, trong đó thanh ghi bộ đệm trọng số được đặt để cố định giá trị trọng số.
+    \item Các đơn vị số học PE cơ bản cùng nhau tạo thành đơn vị số học cơ bản Tile trong GEMM, sau đó được kết nối để tạo thành toàn bộ mảng systolic.
+    \item Các thanh ghi được đặt giữa các tile - một đơn vị tính toán cơ bản trong mô-đun tính toán ma trận của bộ tăng tốc, để tổ chức đường ống tile cho tính toán xung.
+\end{itemize}
+\subsubsection{Đánh giá và kết luận}
+Hiệu suất của bộ tăng tốc được đánh giá qua hai bước chính:
+\begin{itemize}
+    \item Tổng hợp và kiểm tra: Đầu tiên, tổng hợp mã của bộ tăng tốc mạng nơ-ron tích chập trên nền tảng Rocket-Chip. Sau đó tiến hành kiểm tra mức tiêu thụ điện năng và tài nguyên phần cứng của bộ tăng tốc.
+    \item Triển khai và đánh giá trực tiếp: kết nối bộ tăng tốc với bảng phát triển Genesys2 thông qua giao tiếp JTAG. Bằng cách sử dụng FPGA truy cập vào bộ nhớ DDR để ghi chương trình kiểm tra, dữ liệu bản đồ đặc trưng và trọng số của mô hình YOLOv3-tiny. Cuối cùng, bộ tăng tốc được kích hoạt để xử lý dữ liệu và kết quả được phân tích.
+\end{itemize}
+Kết quả phân tích cho thấy bộ tăng tốc có thể xử lý hình ảnh với tốc độ 0.024 giây/hình, tương đương 42 khung hình/giây (fps). Tài liệu cũng so sánh bộ tăng tốc này với một nghiên cứu khácvà nhận thấy bộ tăng tốc của họ tiêu tốn nhiều tài nguyên phần cứng hơn do sử dụng lõi kép BOOM 64-bit.
+

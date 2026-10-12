@@ -1,0 +1,14 @@
+\subsection{Giới thiệu}
+
+
+    RISC-V là một kiến trúc tập lệnh (ISA) mã nguồn mở, được thiết kế với mục đích cung cấp một nền tảng linh hoạt cho các ứng dụng từ nghiên cứu đến công nghiệp. Đây là một kiến trúc tập lệnh dựa trên nguyên lý RISC (Reduced Instruction Set Computing), giúp giảm độ phức tạp của phần cứng và tăng hiệu quả xử lý. Với khả năng mở rộng, RISC-V đang dần trở thành lựa chọn phổ biến cho các vi xử lý trong các thiết bị nhúng, vi xử lý hiệu suất cao và các hệ thống AIoT.
+\\\\
+    Tính linh hoạt của RISC-V cho phép nó được áp dụng trong nhiều lĩnh vực khác nhau, từ các vi xử lý đơn giản đến các ứng dụng đòi hỏi xử lý dữ liệu phức tạp. Dưới đây là một số công nghệ chính được tích hợp trong kiến trúc RISC-V để tối ưu hóa hiệu suất và khả năng ứng dụng:
+\begin{enumerate}
+    \item \textit{Kiến trúc Load-Store:} RISC-V tuân theo nguyên lý kiến trúc load-store, trong đó các lệnh số học chỉ hoạt động trên thanh ghi (registers). Các thao tác với bộ nhớ chỉ được thực hiện qua các lệnh tải (load) và lưu (store). Điều này giúp đơn giản hóa quá trình truy cập và xử lý dữ liệu, đồng thời tối ưu hóa việc sử dụng các tài nguyên phần cứng, như bộ nhớ và thanh ghi.
+    \item \textit{Thứ tự byte Little-endian:} RISC-V sử dụng thứ tự byte little-endian trong hệ thống bộ nhớ. Điều này có nghĩa là byte có trọng số thấp nhất (Least Significant Byte - LSB) sẽ được lưu trữ tại địa chỉ bộ nhớ thấp nhất. Thứ tự này giúp tối ưu hóa tốc độ truyền tải dữ liệu và giảm độ phức tạp khi làm việc với các hệ thống bộ nhớ lớn.
+    \item \textit{Kỹ thuật RVC (RISC-V Code Compression):} Một tính năng quan trọng khác của RISC-V là kỹ thuật nén mã RVC (RISC-V Code Compression). Kỹ thuật này giúp giảm kích thước chương trình và cải thiện hiệu suất thông qua việc giảm số chu kỳ CPU cần thiết để thực thi mỗi lệnh. RVC giúp giảm thiểu không gian bộ nhớ và tiết kiệm năng lượng, đồng thời vẫn duy trì khả năng xử lý hiệu quả, phù hợp với các hệ thống có tài nguyên hạn chế.
+    \item \textit{Mở rộng kiến trúc (Extensions):} Một trong những điểm mạnh của RISC-V là khả năng mở rộng kiến trúc để hỗ trợ các ứng dụng cụ thể. RISC-V cho phép phát triển các tiện ích mở rộng (extensions) để tối ưu hóa vi xử lý cho các ứng dụng như xử lý tín hiệu, đồ họa, trí tuệ nhân tạo, hoặc các tính năng bảo mật. Điều này giúp RISC-V có thể tùy chỉnh để phù hợp với các yêu cầu của từng ngành công nghiệp.
+\end{enumerate}
+Thông qua việc áp dụng các công nghệ như load-store architecture, RVC và các tiện ích mở rộng, RISC-V mang lại hiệu suất cao, tiết kiệm năng lượng và khả năng tùy chỉnh linh hoạt cho các ứng dụng trong nhiều lĩnh vực khác nhau.
+

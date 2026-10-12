@@ -1,0 +1,103 @@
+\subsection{Mạng nơ-ron tích chập (Convolutional Neural Network)}
+\subsubsection{Tổng quan}
+Trong lĩnh vực học sâu, mạng nơ-ron tích chập (CNN) là một trong những thuật toán nổi tiếng và được sử dụng phổ biến nhất. Lợi ích chính của CNN so với các thuật toán tiền nhiệm là khả năng tự động nhận diện các đặc trưng liên quan mà không cần sự giám sát của con người. CNN đã được áp dụng rộng rãi trong nhiều lĩnh vực khác nhau, bao gồm thị giác máy tính, xử lý giọng nói, nhận diện khuôn mặt,... Cấu trúc của CNN được lấy cảm hứng từ các nơ-ron trong não bộ của con người và động vật, tương tự như mạng nơ-ron truyền thống.\\
+Lợi ích của việc sử dụng mạng nơ-ron tích chập:
+\begin{itemize}
+    \item Chia sẻ trọng số (Weight Sharing): Lý do chính để sử dụng CNN là tính năng chia sẻ trọng số, giúp giảm số lượng tham số cần huấn luyện trong mạng, từ đó cải thiện khả năng khái quát hóa của mạng và tránh hiện tượng quá khớp (overfitting).
+    \item Học đồng thời các lớp trích xuất đặc trưng và lớp phân loại: Quá trình học đồng thời này làm cho đầu ra của mô hình vừa có tính tổ chức cao vừa phụ thuộc chặt chẽ vào các đặc trưng đã được trích xuất.
+    \item Dễ dàng triển khai mạng quy mô lớn: Việc triển khai các mạng quy mô lớn trở nên dễ dàng hơn rất nhiều với CNN so với các mạng nơ-ron khác.
+\end{itemize}
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/cnn_example.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Một ví dụ về kiến trúc CNN dùng cho phân loại hình ảnh}
+\end{figure}
+\subsubsection{Thành phần của mạng nơ-ron tích chập}
+\paragraph{Convolutional Layer} 
+Trong kiến trúc CNN, thành phần quan trọng nhất là lớp tích chập. Lớp này bao gồm một tập hợp các bộ lọc tích chập (gọi là các kernel). Hình ảnh đầu vào, được biểu diễn dưới dạng ma trận N chiều, sẽ được tích chập với các bộ lọc này để tạo ra bản đồ đặc trưng (feature map).\\
+Trong lớp này, nhiều bộ lọc tích chập có cùng kích thước được áp dụng, với mỗi bộ lọc được thiết kế để phát hiện các mẫu cụ thể trong hình ảnh, chẳng hạn như cạnh, đường cong hoặc hình dạng tổng thể của các đối tượng như chữ số.
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/conv_example.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Một ví dụ về lớp tích chập}
+\end{figure}
+\\
+Phép tích chập tại điểm $i,j$ được định nghĩa như sau:
+\begin{equation}
+    y(i, j) = (I \times K)(i, j) + b = \sum_{m}^{F}\sum_{n}^{F}I(i + m, j + n)K(m, n) + b
+\end{equation}
+\begin{itemize}
+    \item $ y(i, j)$: Giá trị đầu ra tại vị trí $(i,j)$ trong bản đồ đặc trưng (feature map).
+    \item  $\displaystyle \sum_{m}^{F}\sum_{n}^{F}$: Phép tổng kép thực hiện lặp qua chiều cao $m$ và chiều rộng $n$ của kernel.
+    \item $I(i + m, j + n)$: Giá trị đầu vào từ ma trận đầu vào tại vị trí $(i + m, j + n)$.
+    \item $K(m, n)$: Giá trị của kernel tại vị trí $(m, n)$.
+    \item $b$: Tham số bias được thêm vào kết quả tích chập.
+\end{itemize}
+\paragraph{Pooling Layer}
+Nhiệm vụ chính của lớp pooling là thực hiện lấy mẫu phụ (sub-sampling) trên các bản đồ đặc trưng (feature maps). Các bản đồ này được tạo ra từ các phép tích chập trước đó. Nói cách khác, phương pháp này thu nhỏ kích thước lớn của bản đồ đặc trưng để tạo ra các bản đồ đặc trưng nhỏ hơn. Đồng thời, lớp pooling vẫn giữ lại phần lớn các thông tin (hoặc đặc trưng) quan trọng trong mỗi bước của giai đoạn pooling.\\
+Tương tự như phép tích chập, cả bước trượt (stride) và kernel đều được gán kích thước trước khi thực hiện phép pooling. Có nhiều phương pháp pooling khác nhau được sử dụng trong các lớp pooling như Max Pooling, Average Pooling,... Nhưng phổ biến và thường được sử dụng nhất là Max Pooling, Min Pooling, và GAP Pooling. Hình 9 minh họa ba phép pooling này.
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/pooling_example.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Ví dụ về lớp pooling}
+\end{figure}
+Hạn chế của Lớp Pooling: Đôi khi, hiệu suất tổng thể của CNN có thể bị giảm do việc sử dụng lớp pooling. Đây là hạn chế chính của lớp này, vì nó giúp CNN xác định liệu một đặc trưng nhất định có xuất hiện trong hình ảnh đầu vào hay không, nhưng chỉ tập trung vào xác định vị trí chính xác của đặc trưng đó. Do đó, mô hình CNN có thể bỏ qua các thông tin liên quan khác.
+\paragraph{Hàm kích hoạt - Activation Function}
+Hàm kích hoạt trong các mạng nơ-ron có vai trò cốt lõi là ánh xạ giá trị đầu vào sang đầu ra. Giá trị đầu vào được xác định bằng cách tính tổng có trọng số của đầu vào neuron kèm với tham số bù (bias, nếu có). Điều này có nghĩa là hàm kích hoạt quyết định liệu một neuron có được kích hoạt hay không dựa trên giá trị đầu vào để tạo ra đầu ra tương ứng.\\
+Các loại hàm kích hoạt phổ biến trong CNN và các mạng nơ-ron sâu khác:\\
+\begin{figure}[h!]
+    \begin{minipage}{0.4\textwidth}
+        \textbf{Sigmoid}: Đầu vào của hàm kích hoạt này là các số thực, trong khi đầu ra được giới hạn trong khoảng từ 0 đến 1. Đường cong của hàm sigmoid có hình dạng chữ S và có thể được biểu diễn toán học trong phương trình sau:
+        \begin{equation}
+        f(x)_{sigmoid}=\frac{1}{1+e^{-x}}
+        \end{equation}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/sigmoid.png} 
+        \caption{Hàm Sigmoid}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[h!]
+    \begin{minipage}{0.4\textwidth}
+        \textbf{TanH}: Hàm này tương tự như hàm sigmoid, vì đầu vào của nó cũng là các số thực, nhưng đầu ra được giới hạn trong khoảng từ -1 đến 1. Biểu diễn toán học của nó được thể hiện trong phương trình sau:
+    \begin{equation}
+        f(x)_{tanh}=\frac{e^{x}-e^{-x}}{e^{x}+e^{-x}}
+    \end{equation}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/tanh.png} 
+        \caption{Hàm TanH}
+    \end{minipage}
+\end{figure}
+
+\begin{figure}[h!]
+    \begin{minipage}{0.4\textwidth}
+        \textbf{ReLU}: Là hàm kích hoạt được sử dụng phổ biến nhất trong CNN. ReLU chuyển tất cả các giá trị đầu vào thành các số dương. Lợi ích chính của ReLU so với các hàm kích hoạt khác là giảm tải tính toán. Biểu diễn toán học của ReLU được thể hiện trong phương trình sau:
+    \begin{equation}
+        f(x)_{ReLU}=max(0,x)
+    \end{equation}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.5\textwidth}
+        \centering
+        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/relu.png} 
+        \caption{Hàm ReLU}
+    \end{minipage}
+\end{figure}
+
+\paragraph{Fully-connected Layer}
+Thông thường, lớp này nằm ở cuối mỗi kiến trúc CNN. Trong lớp này, mỗi neuron được kết nối với tất cả các neuron của lớp trước đó, gọi là phương pháp Kết nối đầy đủ (Fully Connected - FC). Nó được sử dụng như một bộ phân loại trong CNN. Lớp này theo phương pháp cơ bản của mạng thần kinh đa lớp truyền thống (MLP), vì nó là một loại mạng ANN truyền thẳng. Đầu vào của lớp FC đến từ lớp pooling hoặc lớp tích chập cuối cùng. Đầu vào này có dạng một vector, được tạo ra từ các bản đồ đặc trưng sau khi làm phẳng. Đầu ra của lớp FC đại diện cho đầu ra cuối cùng của CNN.
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/fc_example.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Lớp fully-connected}
+\end{figure}

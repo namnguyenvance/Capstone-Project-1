@@ -1,0 +1,76 @@
+\subsection{Design and Analysis of a Hardware CNN Accelerator}
+\subsubsection{Thiết kế bộ tăng tốc}
+Kiến trúc tổng quát của hệ thông được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandAnalysisofaHardwareCNNAccelerator/overall_architecture.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Thiết kế tổng quan của hệ thống}
+\end{figure}
+\\
+Trọng tâm của bộ gia tốc CNN, được gọi là ConvAU, là một đơn vị nhân ma trận dày (MMU) có thể thực hiện phép nhân số nguyên 8 bit 256 × 256 và tích lũy số nguyên 32 bit mỗi chu kỳ. Việc tăng tốc nhân ma trận dày đã được nghiên cứu rộng rãi vì nó được sử dụng trong GPU và thuật toán DSP, với các phương pháp triển khai phổ biến nhất là mảng systolic, FFT hoặc thuật toán Winograd.
+\paragraph{Thiết kế mảng Systolic}
+Thiết kế của mảng systolic được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandAnalysisofaHardwareCNNAccelerator/systolic_array.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Thiết kế của mảng systolic}
+\end{figure}
+\\
+Trong ConvAU, mỗi phần tử xử lý (PE) có một bộ nhân và một bộ tích lũy, và có thể tính toán một hoạt động MAC duy nhất mỗi chu kỳ. Trọng số được lưu trữ cục bộ trước khi bắt đầu thực thi. Đối với phép nhân ma trận N $\times$ N, cần 2N - 1 chu kỳ xung nhịp để sóng đầu ra lan truyền và hoàn thành phép nhân. ConvAU sử dụng FIFO SRAM 8 bit 256 $\times$ 256 (64kB) để đưa dữ liệu vào mảng systolic. Thay vì đệm dữ liệu để đồng bộ hóa việc tải dữ liệu với bộ nhân mảng systolic, một bit hợp lệ trên mỗi hàng được sử dụng để đồng bộ hóa dữ liệu. Điều này tiết kiệm gần 64kB bộ nhớ trên đầu vào và đầu ra.
+\paragraph{Nạp trọng số}
+Một khía cạnh quan trọng của thiết kế là trọng số phải được nạp trước vào mảng trước khi phép nhân có thể diễn ra. Để thực hiện việc này, trọng số được nạp tương tự như cách dữ liệu được nạp, sử dụng một hàng đợi ở cạnh mảng và mỗi PE chuyển trọng số hiện tại của nó cho hàng xóm của nó. Điều này mất 256 chu kỳ để hoàn thành, mặc dù nó có thể được kết hợp với phép nhân ma trận.\\
+\\
+Một cách tiếp cận khác là cho trọng số di chuyển theo chiều dọc xuống mảng và tính toán các tích riêng phần tại mỗi nút. Tuy nhiên, điều này có nhược điểm là dừng thực thi khi hoàn thành phép nhân 256 × 256. Ngoài ra, trọng số sẽ phải được đọc lại từ bộ nhớ ngay cả khi bạn muốn sử dụng lại cùng trọng số như hoạt động trước đó. Vì trọng số thường được chia sẻ (ví dụ: cho các bộ lọc trong các lớp cuộn, hoặc trên các lô đầu vào), nên cách tiếp cận được sử dụng trong ConvAU sẽ dẫn đến ít truy cập bộ nhớ và đường ống bị dừng hơn so với cách thay thế.
+\paragraph{Lượng tử hóa}
+Mạng thần kinh nhân tạo (ANN) thường được triển khai bằng cách sử dụng số dấu phẩy động. Tuy nhiên, các phép nhân ma trận số dấu phẩy động lớn phức tạp hơn và kém hiệu quả hơn trong phần cứng so với các phép toán số nguyên tương đồng. ConvAU hỗ trợ các mạng đã được quantized (8-bit integers), sử dụng chiến lược uniform quantization để đơn giản hóa phần cứng và đảm bảo tính chính xác.\\
+\\
+Để tương thích với TensorFlow, ConvAU sử dụng cùng định dạng lượng hóa như thư viện Google gemmlowp. Mỗi ma trận được liên kết với siêu dữ liệu lượng hóa, bao gồm thang đo 32-bit và độ lệch có dấu 16-bit. Thông tin này được sử dụng để chuyển đổi giữa các giá trị thực và giá trị lượng tử.\\
+\\
+Quá trình lượng hóa được thực hiện bằng cách biểu diễn mỗi giá trị thực $\xi$ trong mạng bằng giá trị 8 bit $\xi_q$ thông qua công thức: $\xi = \xi_s(\xi_q-\xi_z)$, trong đó $\xi_s$ là tham số tỷ lệ và $\xi_z$ là điểm zero cho $\xi$ . Công thức này được áp dụng cho cả trọng số và kích hoạt.\\
+\\
+ConvAU sử dụng phép nhân 8 bit và bộ tích lũy 32 bit cho tất cả các giá trị trung gian. Điều này đảm bảo độ chính xác trong khi vẫn duy trì hiệu quả.
+\subsubsection{Ánh xạ các lớp CNN thành phép nhân ma trận}
+Để thực hiện suy luận trên ConvAU, mỗi hoạt động trong mạng nơ-ron tích chập phải được ánh xạ thành một phép nhân ma trận dày đặc hoặc một hoạt động kích hoạt. Dưới đây là cách các lớp phổ biến được ánh xạ:
+\begin{itemize}
+    \item Lớp kết nối đầy đủ (Fully connected layers): Đây là loại lớp đơn giản nhất để ánh xạ. Mỗi kích hoạt trong một lớp kết nối đầy đủ là kết quả của phép nhân vô hướng giữa các giá trị đầu vào và trọng số, cộng thêm một bias. Do đó, toàn bộ lớp có thể được triển khai trực tiếp như một phép nhân ma trận giữa đầu vào và trọng số, cộng thêm một số hạng bias.
+    \item Lớp tích chập (Convolutional layers): Lớp tích chập bao gồm phép tích chập giữa đầu vào và trọng số bộ lọc, cộng thêm một số hạng bias. Phép toán tích chập có thể được giảm thành phép nhân ma trận giữa các "miếng vá" đầu vào (patch) và trọng số bộ lọc. Biến đổi từ đầu vào thành các miếng vá này được gọi là "im2col".
+    \item Chuẩn hóa theo batch (Batch normalization): Lớp chuẩn hóa theo batch đơn giản là dịch chuyển và tỷ lệ đầu vào bằng hai giá trị đã học được (cả hai đều không đổi trong quá trình suy luận), $\mu$ và $\sigma$. Vì lớp chuẩn hóa theo batch thường theo sau một lớp tích chập hoặc lớp kết nối đầy đủ, nên có thể kết hợp cả hai lớp bằng cách dịch chuyển và tỷ lệ trọng số và bias của lớp trước đó, sau đó xử lý lớp trước đó như bình thường.
+\end{itemize}
+
+\subsubsection{Đánh giá}
+\paragraph{Phương pháp đánh giá}
+\begin{itemize}
+    \item ConvAU được triển khai dưới dạng mô hình RTL (Register-Transfer Level) trong SystemVerilog và được mô phỏng để suy luận trên mô hình Squeezenet 8-bit lượng tử hóa.
+    \item Tập dữ liệu ILSVRC2016 CLS-LOC được sử dụng, với các tệp JPEG được lấy mẫu ngẫu nhiên và thay đổi kích thước thành 224x224 pixel.
+    \item Mức tiêu thụ năng lượng được ước tính bằng cách lấy mẫu ngẫu nhiên các phép toán ma trận từ mỗi lớp trong quá trình mô phỏng, chuyển đổi tệp VCD (Value Change Dump) thành tệp SAIF (Switching Activity Interface Format) và sử dụng PrimeTime để phân tích hoạt động chuyển mạch.
+\end{itemize}
+\paragraph{Kết quả đánh giá}
+Kết quả khi so sánh giữa các kiến trúc mẫu và ConvAU được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{Images/CNNAccelerator/DesignandAnalysisofaHardwareCNNAccelerator/comparison.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Kết quả so sánh giữa những model sẵn và ConvAU}
+\end{figure}
+Mức tiêu thụ điện năng của cell được thể hiện ở hình bên dưới:
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{Images/CNNAccelerator/DesignandAnalysisofaHardwareCNNAccelerator/power_consumption.png}
+    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
+    \caption{Mức tiêu thụ điện năng}
+\end{figure}
+\begin{itemize}
+    \item ConvAU đạt thông lượng đỉnh là 93.6 TOPs trong khi chỉ tiêu thụ 21W, cho tỷ lệ 4.4 TOPs/W. Điều này cao hơn 200 lần so với K80 (0.022 TOPs/W) và 1.9 lần so với TPU (2.3 TOPs/W).
+    \item Tuy nhiên, TPU có bộ nhớ trên chip lớn hơn nhiều so với ConvAU (28 MiB so với 4 MiB). Điều này có thể đóng góp một phần vào mức tiêu thụ năng lượng cao hơn của TPU.
+    \item Phân tích cho thấy bộ nhớ chỉ chiếm khoảng 16\% tổng mức tiêu thụ năng lượng của ConvAU. Phần lớn năng lượng được tiêu thụ bởi các thanh ghi và logic tổ hợp.
+    \item Nếu ConvAU được trang bị bộ nhớ trên chip có kích thước tương tự như TPU, thì tỷ lệ TOPs/W của nó sẽ giảm xuống còn khoảng 2.2. Điều này cho thấy rằng ConvAU và TPU có hiệu suất năng lượng tương đương khi được điều chỉnh cho kích thước bộ nhớ.
+\end{itemize}
+
+
+
+
+
+
+

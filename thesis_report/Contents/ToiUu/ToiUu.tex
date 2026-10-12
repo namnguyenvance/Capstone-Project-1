@@ -1,0 +1,190 @@
+\chapter{TỐI ƯU HÓA VÀ PHÂN TÍCH HIỆU NĂNG}
+\label{chap:toiuu}
+\section{Baseline và phương pháp đánh giá}
+Quá trình tối ưu hóa bắt đầu từ hệ thống đã có các bộ tăng tốc, với tổng thời gian suy luận 62\,071\,887 chu kỳ. Vì vậy, thuật ngữ baseline trong chuỗi Level~1--6 chỉ phiên bản tăng tốc ban đầu, không phải phiên bản CPU-only. Mục tiêu là giảm chi phí cấp dữ liệu và điều khiển mà không thay đổi mô hình, bố trí tensor hay kết quả suy luận của phép thử đối chiếu.
+
+Các mốc chu kỳ được tổng hợp từ các lần mô phỏng SoC tích hợp đã được ghi nhận trong walkthrough, mục~9.6. Thời gian từng lớp được lấy theo ranh giới đọc bộ đếm chu kỳ, không bao gồm UART của chính lớp đó; tổng đầu cuối chứa UART giữa các lớp cùng chi phí điều phối. Vì thế, tổng các hàng theo lớp không bằng tổng chu kỳ suy luận. Thời gian chạy mô phỏng trên máy chủ không được sử dụng để tính speedup kiến trúc.
+
+Phép thử lịch sử chạy ảnh nhúng số~0 có nhãn~7. Kiểm tra đúng đắn gồm điểm số cuối và nhãn dự đoán; các kiểm tra tensor và giao dịch tập trung được walkthrough ghi nhận cho từng mức. Các điểm số giống nhau trên ảnh này không thay thế đánh giá độ chính xác toàn bộ tập MNIST, cũng không chứng minh tương đương RTL/TFLite. Tài liệu \texttt{evaluation/README.md} quy định tách riêng độ chính xác mô hình, đồng thuận dự đoán và tương đương tối ưu hóa.
+
+Các lần chạy lịch sử báo LED \texttt{0xFF} do chạy một ảnh nhưng so với mẫu số 100. Mã firmware hiện tại đã có \texttt{TINYMOBILENET\_TEST\_COUNT} và báo trạng thái theo số ảnh cấu hình; không nên suy diễn lỗi báo cáo lịch sử thành hành vi hiện tại. Các chu kỳ Level~1--6 dưới đây vẫn là mốc lịch sử, không phải phép đo mới do công việc viết luận văn này thực hiện.
+
+Để thống nhất cách so sánh, đặt $C_B$ là chu kỳ baseline tăng tốc và $C_L$ là chu kỳ một mức tối ưu:
+\begin{equation}
+ R_L=\left(1-\frac{C_L}{C_B}\right)100\%,\qquad
+ S_L=\frac{C_B}{C_L}.
+\end{equation}
+Mỗi bước được phân tích theo nút thắt, quan sát, thay đổi, hiệu quả đo được và đánh đổi. Các dữ liệu nguồn cùng giới hạn diễn giải được lưu trong ghi chú bằng chứng của luận văn.
+
+\section{Level 1: tối ưu vòng lặp Pointwise trong firmware}
+Nút thắt đầu tiên nằm ở việc CPU lặp qua từng trọng số trước mỗi tích vô hướng. Khi tải từng phần tử bằng vòng lặp scalar, các lệnh tăng chỉ số, tính địa chỉ và rẽ nhánh phát sinh bên cạnh giao dịch MMIO bắt buộc. Baseline đã giữ vector INPUT dùng chung giữa các kênh đầu ra tại một vị trí, nên cơ hội tiếp theo là giảm điều khiển vòng tải WEIGHT.
+
+Level~1 unroll vòng tải theo nhóm bốn trọng số, giữ nhánh xử lý phần dư scalar và giữ INPUT scalar. Thứ tự duyệt vẫn là vị trí không gian trước, DEPTH được ghi một lần mỗi lớp. Thay đổi này không sửa RTL và không giảm số giao dịch trọng số; lợi ích đến từ mã máy CPU ít điều khiển vòng lặp hơn.
+
+Tổng chu kỳ giảm xuống 55\,395\,889. PW1 giảm từ 16\,744\,574 xuống 13\,890\,810 chu kỳ, PW2 từ 10\,676\,131 xuống 8\,168\,895 và PW3 từ 5\,019\,251 xuống 3\,705\,655. Các lớp ngoài Pointwise giữ nguyên chu kỳ ở mức này. Đánh đổi là mã nguồn dài hơn và cần duy trì phần dư; sau khi giảm overhead vòng lặp, số lần ghi MMIO trọng số vẫn là nút thắt rõ rệt.
+
+\section{Level 2: đóng gói trọng số Pointwise qua MMIO}
+Quan sát tiếp theo là trọng số mô hình chỉ rộng tám bit nhưng giao dịch bus rộng 32 bit. Level~2 bổ sung vùng ghi packed: một word chứa bốn byte trọng số, theo thứ tự little-endian, được RTL mở rộng dấu vào các lane tương ứng. Giao diện scalar legacy được giữ để xử lý phần dư và bảo toàn ngữ nghĩa toán hạng cũ.
+
+\begin{table}[!ht]
+\centering
+\caption{Số lần ghi WEIGHT khi chuyển từ scalar sang packed}
+\label{tab:packed-traffic}
+\begin{tabular}{lrr}
+\hline
+Lớp & Level 1 & Level 2 \\
+\hline
+PW1 & 401\,408 & 100\,352 \\
+PW2 & 301\,056 & 75\,264 \\
+PW3 & 150\,528 & 37\,632 \\
+\hline
+\end{tabular}
+\end{table}
+Với depth hiện tại 16, 32 và 48, toàn bộ trọng số chia hết theo nhóm bốn, làm giảm 75\% số lần ghi WEIGHT. Firmware kiểm tra alignment trước khi dùng đường tải word qua \texttt{\_\_builtin\_memcpy}; con trỏ không thẳng hàng dùng ghép byte. Cách làm này tránh phụ thuộc tải word không thẳng hàng hoặc ép kiểu vi phạm aliasing.
+
+Việc tăng dữ liệu hữu ích trên mỗi lần ghi MMIO đưa tổng suy luận xuống 46\,579\,875 chu kỳ. PW1, PW2 và PW3 lần lượt còn 10\,063\,326, 4\,903\,931 và 2\,008\,201 chu kỳ. Đánh đổi là thêm logic giải mã và mở rộng dấu, đồng thời firmware phải thống nhất thứ tự byte với RTL. INPUT, đọc RESULT và trigger từng kênh chưa giảm tương ứng; chúng trở thành phần chi phí cần giải quyết ở bước sau.
+
+\section{Level 3: xử lý Pointwise theo batch bốn kênh}
+Ở Level~2, cùng vector đầu vào đã được giữ qua nhiều kênh nhưng mỗi kênh còn phải trigger riêng. Level~3 đưa trọng số của bốn kênh vào bốn bank và dùng một lần ghi điều khiển batch. Datapath tích vô hướng được dùng chung, tính lần lượt bank 0--3; đây là gom điều khiển và tái sử dụng dữ liệu, không nhân bốn toàn bộ tài nguyên tính toán.
+
+DEPTH được snapshot khi trigger. Bốn kết quả được công bố đồng thời sau bốn chu kỳ tính toán. Bank~0 giữ ngữ nghĩa trọng số signed 32 bit legacy, các bank bổ sung nhận trọng số packed INT8. Nếu số kênh đầu ra không chia hết cho bốn, firmware dùng đường single-output; phần dư depth trong batch được zero-pad trong word packed.
+
+Để tránh kết quả cũ hoặc từng phần, SoC giữ giao dịch đọc BATCH\_RESULT khi \texttt{rvalid} chưa được đặt. Firmware không cần lệnh polling hay delay. Kiểm tra bus lịch sử ghi nhận truy cập thông thường cần hai cạnh lấy mẫu CPU, trong khi lần đọc batch sớm nhất cần năm cạnh, tức thêm ba chu kỳ stall. Số này mô tả giao dịch đọc, khác với độ trễ tính toán bốn chu kỳ.
+
+Việc gom trigger và chờ kết quả ở bus đưa tổng thời gian xuống 44\,156\,359 chu kỳ. PW1 đạt 8\,393\,456, PW2 đạt 4\,286\,581 và PW3 đạt 1\,810\,193 chu kỳ. Đổi lại, cần bộ điều khiển batch, bank bổ sung, trạng thái hợp lệ và quy tắc bỏ qua ghi khi busy. Conv0 tăng từ 7\,712\,627 ở Level~2 lên 7\,775\,776 chu kỳ do thay đổi code generation được ghi nhận; vì vậy không thể chỉ cộng phần tiết kiệm Pointwise để suy ra tổng hệ thống. Sau bước này, DW2 tích lũy bằng CPU nổi lên như một nút thắt đáng kể.
+
+\section{Level 4: tái sử dụng bộ tăng tốc Depthwise cho DW2}
+DW2 có input $28\times28\times32$, output $14\times14\times32$, kernel $3\times3$, stride~2 và depth multiplier bằng một. Quan sát hình học cho thấy một patch $5\times5$ đủ tạo bốn đầu ra stride~2. Bộ tăng tốc đã tạo chín cửa sổ stride~1; firmware chỉ cần lấy các kết quả 0, 2, 6, 8 để tạo tile đầu ra $2\times2$.
+
+Level~4 tải kernel một lần mỗi kênh, nạp patch theo tile và trigger một lần cho bốn đầu ra. Các chỉ số nguồn được kiểm tra trước khi đọc RAM; padding là literal zero. Sau khi đọc kết quả, chuỗi bias, lượng tử hóa, offset, clamp và lưu CHW được giữ nguyên. Thay đổi không sửa RTL và không bổ sung tài nguyên FPGA.
+
+Đồng thời, fallback stride~2 được tách thành helper static \texttt{noinline} tên \texttt{DWStride2CPU}. Điều này giữ thuật toán nhưng thay đổi khả năng cấp phát thanh ghi của compiler cho các nhánh còn lại. DW3 vẫn tích lũy bằng CPU. Vì vậy, lợi ích của Level~4 bao gồm tái sử dụng phần cứng cho DW2 và hiệu ứng code generation, không chỉ thời gian tính của accelerator.
+
+DW2 giảm từ 10\,869\,269 xuống 3\,994\,547 chu kỳ. DW1 giảm từ 6\,658\,976 xuống 6\,421\,895 và DW3 từ 3\,990\,023 xuống 3\,155\,797. Tổng đạt 36\,208\,913 chu kỳ. Giới hạn của giải pháp là nhánh tăng tốc chỉ nhận shape DW2 đã kiểm chứng; các shape khác phải giữ fallback. Khi DW2 được giảm, chi phí tải lại trọng số PW1 qua mọi vị trí trở thành mục tiêu tiếp theo.
+
+\section{Level 5: cache trọng số PW1 thường trú}
+\subsection{Quan sát và thay đổi}
+PW1 có 32 kênh đầu ra, mỗi kênh dùng 16 trọng số INT8. Toàn tensor chỉ cần $32\times16=512$ byte nhưng đường batch trước đó vẫn nạp lại qua 784 vị trí không gian. Level~5 thêm cache logic $32\times128$ bit, tức 4\,096 bit hay 512 byte. Firmware preload một lần cho lớp rồi giữ trọng số thường trú; mỗi trigger chọn nhóm bốn kênh và dùng datapath batch hiện có.
+
+Bitmap ghi nhận 128 word đã nạp, giúp từ chối trigger khi dữ liệu chưa hoàn chỉnh. Reset và preload mới hủy tính hợp lệ; ghi khi busy bị bỏ qua theo RTL. Các thanh ghi kết quả và \texttt{rvalid} được dùng lại, nên không cần thay đổi bộ giải mã trong \texttt{my\_soc.v} hoặc thêm vòng chờ bằng phần mềm.
+
+\subsection{Hiệu quả và đánh đổi}
+Số lần tải word trọng số từ RAM của PW1 giảm từ 100\,352 xuống 128. Thời gian PW1 giảm từ 8\,393\,456 xuống 3\,318\,925 chu kỳ, tương ứng 60,46\%. INPUT, số lần đọc kết quả, bias, lượng tử hóa và clamp giữ nguyên. Tổng suy luận còn 31\,135\,055 chu kỳ. Chi phí dispatcher làm Conv0, PW2 và PW3 tăng nhẹ, vì thế cải thiện tổng không hoàn toàn bằng cải thiện riêng PW1.
+
+Cache này có shape cố định cho PW1, không phải bộ nhớ trọng số tổng quát cho cả mạng. Việc giữ dữ liệu qua nhiều vị trí giảm truyền MMIO nhưng bổ sung storage, chọn hàng và kiểm tra hợp lệ. Truy cập cache bất đồng bộ cùng mux chọn bank có thể kéo dài đường tới bộ nhân và cây cộng; kích thước nhỏ không tự bảo đảm chi phí timing nhỏ. Ánh xạ LUTRAM/FF hoặc BRAM phải dựa trên báo cáo tổng hợp.
+
+Báo cáo post-route của run \texttt{20261011\_221527\_22836\_8p875ns}, Vivado~2024.1, trên \texttt{xczu7ev-ffvc1156-2-e} ghi WNS setup $+0{,}056$~ns với chu kỳ ràng buộc $8{,}875$~ns. Đường setup xấu nhất đi từ \texttt{batch\_bank} tới thanh ghi kết quả Pointwise qua lựa chọn toán hạng và datapath. Điều này hỗ trợ nhận xét rằng điều khiển chọn dữ liệu nằm trên đường timing quan trọng. Tuy nhiên, đây là báo cáo của thiết kế cuối, không phải cặp hiện thực trước/sau cache có điều kiện giống nhau; không được quy toàn bộ tài nguyên hay thay đổi timing cho riêng Level~5. Sau khi giảm truyền trọng số PW1, Conv0 vẫn phải nạp lại patch theo từng kênh; đây là nút thắt được xử lý ở Level~6. Flow này thiếu ràng buộc chân vật lý và khởi tạo firmware, nên kết quả cũng không chứng minh suy luận thực tế trên ZCU106.
+
+\section{Level 6: tile reuse cho đầu vào Conv0}
+Sau khi giảm tải trọng số Pointwise, Conv0 còn lặp nạp cùng patch cho từng kênh đầu ra. Level~6 áp dụng tile reuse bằng helper \texttt{TileConv0Hardware} cho đúng shape $28\times28\times1$ sang $28\times28\times16$, kernel $3\times3$, stride~1, padding~1. Vòng ngoài duyệt tile không gian; patch $5\times5$ được dựng và nạp một lần, rồi giữ qua toàn bộ 16 kênh đầu ra. Mỗi kênh vẫn tải kernel và trigger Conv như trước.
+
+Tại hàng, cột và góc biên, firmware chỉ đọc những RESULT có vị trí đầu ra hợp lệ. Các kiểm tra nguồn ngăn đọc ngoài tensor; padding vẫn là số nguyên không. Thay đổi không sửa RTL, số phép requantization và số phần tử đầu ra phải lưu vẫn giữ nguyên.
+
+\begin{table}[!ht]
+\centering
+\caption{Lưu lượng dữ liệu Conv0 trước và sau Level 6}
+\label{tab:conv0-reuse}
+\begin{tabular}{lrr}
+\hline
+Đại lượng & Level 5 & Level 6 \\
+\hline
+Ghi INPUT qua MMIO & 40\,000 & 2\,500 \\
+Tải phần tử input hợp lệ từ RAM & 33\,856 & 2\,116 \\
+Đọc RESULT & 14\,400 & 12\,544 \\
+Giao dịch bộ tăng tốc lượng tử & 62\,720 & 62\,720 \\
+Lưu phần tử output & 12\,544 & 12\,544 \\
+\hline
+\end{tabular}
+\end{table}
+Conv0 giảm từ 7\,776\,032 xuống 3\,163\,926 chu kỳ; tổng đạt 26\,523\,121 chu kỳ. PW1, PW2 và PW3 tăng lần lượt 28, 57 và 57 chu kỳ do dispatcher, còn DW1/DW2/DW3, GAP và FC giữ nguyên thời gian. Đánh đổi chủ yếu là helper phụ thuộc shape và lịch vòng lặp phức tạp hơn tại biên. Không có tài nguyên RTL mới; hiệu quả đến từ tránh truyền lại dữ liệu và tránh đọc kết quả không dùng. Sau thay đổi này, DW1 và chi phí truyền trọng số PW2 trở thành các mục tiêu lớn còn lại, như phân tích ở phần theo lớp.
+
+Theo bằng chứng mô phỏng lịch sử, cả bảy phiên bản giữ vector điểm số
+\begin{center}
+\texttt{[7, 33, -13, -27, 19, 1, -43, 115, -44, 45]},
+\end{center}
+với dự đoán và nhãn kỳ vọng đều bằng~7. Tính bất biến này giới hạn ở phép thử đã ghi nhận. Các kiểm tra tensor tập trung bổ sung bằng chứng cho các miền dữ liệu được thử, không mở rộng thành chứng minh tương đương mọi đầu vào.
+
+\begin{figure}[!ht]
+\centering
+\fbox{\parbox{0.88\textwidth}{\centering Vị trí chờ minh họa lịch Conv0 trước/sau: channel-first nạp lại patch và tile-first giữ patch qua các kênh.}}
+\caption{Vị trí chờ minh họa tái sử dụng dữ liệu ở Level 6}
+\label{fig:tile-reuse-placeholder}
+\end{figure}
+% TODO figure: chỉ minh họa lịch firmware, không thêm khối RTL giả định.
+
+\section{Kết quả tối ưu hóa tổng thể}
+\begin{table}[!ht]
+\centering
+\caption{Tổng chu kỳ suy luận của baseline tăng tốc và các mức tối ưu}
+\label{tab:levels}
+\begin{tabular}{lr}
+\hline
+Phiên bản & Tổng chu kỳ \\
+\hline
+Baseline tăng tốc & 62\,071\,887 \\
+Level 1 & 55\,395\,889 \\
+Level 2 & 46\,579\,875 \\
+Level 3 & 44\,156\,359 \\
+Level 4 & 36\,208\,913 \\
+Level 5 & 31\,135\,055 \\
+Level 6 & 26\,523\,121 \\
+\hline
+\end{tabular}
+\end{table}
+Từ hai đầu mút, tổng giảm 57,27\% và speedup tối ưu hóa đạt $2{,}3403\times$. Đây là lợi ích của chuỗi thay đổi trên hệ thống vốn đã tăng tốc. Các bước đầu giảm điều khiển và truyền trọng số Pointwise; các bước sau khai thác hình học DW2, cache PW1 và giữ input Conv0. Sự dịch chuyển mục tiêu cho thấy cần đo lại sau mỗi thay đổi, thay vì tiếp tục tối ưu một lớp theo tỷ trọng baseline ban đầu.
+
+\section{Phân tích theo lớp ở Level 6}
+\begin{table}[!ht]
+\centering
+\caption{Chu kỳ từng lớp tại Level 6; tổng đầu cuối bao gồm UART giữa các lớp}
+\label{tab:level6-layers}
+\begin{tabular}{lr}
+\hline
+Lớp & Chu kỳ \\
+\hline
+Conv0 & 3\,163\,926 \\
+DW1 & 6\,421\,895 \\
+PW1 & 3\,318\,953 \\
+DW2 & 3\,994\,547 \\
+PW2 & 4\,286\,894 \\
+DW3 & 3\,155\,797 \\
+PW3 & 1\,810\,506 \\
+GAP & 187\,380 \\
+FC & 50\,824 \\
+\hline
+Tổng đầu cuối & 26\,523\,121 \\
+\hline
+\end{tabular}
+\end{table}
+DW1 là lớp đơn lẻ lớn nhất sau tối ưu. Mặc dù tích lũy đã chạy bằng phần cứng, CPU vẫn phải dựng patch, chuyển dữ liệu, đọc kết quả và gọi bộ tăng tốc lượng tử cho từng đầu ra. PW2 còn chi phí nạp trọng số theo vị trí vì chưa có cache như PW1. DW2 vẫn chịu truyền patch và hậu xử lý; DW3 còn tích lũy trên CPU. GAP và FC có thời gian nhỏ hơn các lớp này nên ít có khả năng tạo cải thiện tổng lớn khi được tối ưu riêng.
+
+PW1 ở bảng cuối là 3\,318\,953 chu kỳ, khác mốc 3\,318\,925 của Level~5 do thêm chi phí dispatcher ở Level~6. Cần giữ đúng phiên bản khi trích dẫn hai số gần nhau. Tỷ trọng còn lại phản ánh cả số học lẫn phục vụ dữ liệu; không nên coi thời gian một lớp là độ trễ thuần của datapath.
+
+\section{So sánh với CPU-only RV32 tương ứng}
+Đối chứng CPU-only trong \texttt{evaluation/CPU\_BASELINE.md} biên dịch các kernel C tổng quát hiện có với \texttt{NATIVE\_RUN} và một ảnh kiểm thử. Nó dùng cùng PicoRV32, cấu hình nhân RV32IM, mô hình, ảnh nhúng, RAM 256~KiB, tensor CHW, offset và cận kích hoạt. Các accelerator vẫn tồn tại trong SoC nhưng assertion mô phỏng cấm truy cập các cửa sổ compute MMIO, kể cả bộ nhân độc lập. Phép nhân bằng lệnh CPU vẫn được phép; requantization ở đối chứng dùng C.
+
+\begin{table}[!ht]
+\centering
+\caption{Hai phép so sánh speedup có baseline khác nhau}
+\label{tab:speedup-baselines}
+\begin{tabular}{lrr}
+\hline
+Đối chứng & Chu kỳ đối chứng & Speedup so với Level 6 \\
+\hline
+Baseline đã tăng tốc & 62\,071\,887 & $2{,}3403\times$ \\
+CPU-only C tổng quát & 259\,218\,212 & $9{,}7733\times$ \\
+\hline
+\end{tabular}
+\end{table}
+CPU-only đo được 259\,218\,212 chu kỳ; chia cho 26\,523\,121 của Level~6 cho speedup $9{,}7733\times$. Kết quả CPU-only được ghi với GCC RV32~16.1.0 và Verilator~5.051, có kiểm tra thụ động ranh giới lấy mẫu CSR và xác nhận không phát sinh compute MMIO. Đây là baseline thư viện C sẵn có, chưa được tối ưu chuyên sâu cho CPU. Speedup bao gồm cả lịch phần mềm đã tối ưu của Level~6 và offload accelerator, không chỉ đóng góp phần cứng.
+
+Tài liệu CPU baseline dùng mốc Level~6 lịch sử và yêu cầu đối chiếu danh tính build khi so sánh chặt chẽ. Bản thảo dựa trên kết quả được ghi trong tài liệu đánh giá và walkthrough; chưa có bộ log/build gốc của toàn bộ các mức tối ưu trong repository để tái lập một phép so sánh đồng thời. Các khác biệt làm tròn native C và RTL vẫn tồn tại dù điểm số cuối trên ảnh này trùng nhau.
+
+\section{Đánh đổi thiết kế và bài học}
+Các kết quả cho thấy MMIO là phần chi phí kiến trúc cần được tối ưu như phép tính. Unroll giảm điều khiển; packed tăng lượng dữ liệu hữu ích mỗi giao dịch; batch giảm trigger và hợp nhất chờ; cache và tile-first loại bỏ truyền lặp. Những cải thiện này không đòi hỏi chuyển toàn bộ suy luận thành phần cứng tự động, nhưng vẫn bị giới hạn bởi CPU phục vụ dữ liệu và requantization từng phần tử.
+
+Phần cứng chuyên biệt khai thác shape tốt hơn giao diện tổng quát: cache PW1 chỉ phù hợp depth~16 và 32 kênh đầu ra, còn helper Conv0 và nhánh DW2 có điều kiện kích thước cụ thể. Lợi ích này đi kèm chi phí bảo trì dispatcher và kiểm chứng fallback. Tăng cache hoặc nhân rộng datapath có thể giảm chu kỳ nhưng làm tăng mux, tài nguyên và độ trễ đường tổ hợp; cần so sánh chu kỳ cùng timing post-route, không suy ra thời gian thực chỉ từ cycle count.
+
+Trong phạm vi dự án, Level~6 được chọn làm mốc chốt hiệu năng. Sau mốc này, dự án đóng băng công việc tối ưu hóa hiệu năng và ưu tiên kiểm chứng, hiện thực FPGA, triển khai và hoàn thiện luận văn. Đây là quyết định phạm vi công việc, không phải kết luận rằng các cơ hội tối ưu đã hết. Các hướng như giảm chi phí phục vụ DW1, mở rộng cache cho PW2 hoặc thay đổi giao tiếp được dành cho nghiên cứu tiếp theo, với yêu cầu đo chu kỳ, kiểm tra số học và đánh giá timing/resource riêng.
+
+Đánh giá MyTinyMobileNetSoC trên ZCU106 đã hoàn thành đến post-route trong flow đánh giá hiện có. Flow của \texttt{my\_soc} chưa khởi tạo RAM bằng firmware và không tạo bitstream suy luận. Nhánh deployment A0 độc lập đã tạo bitstream smoke-test cho clock/reset/LED, nhưng chưa nạp hoặc kiểm thử vật lý trên bo mạch; nhánh này không chứa PicoRV32 hay các bộ tăng tốc. Vì vậy, triển khai TinyMobileNet vật lý, suy luận trên bo mạch và kiểm thử LED vật lý đều còn chờ xác nhận. Các chu kỳ mô phỏng chưa được chuyển thành khẳng định latency hoặc năng lượng đo trên bo mạch.

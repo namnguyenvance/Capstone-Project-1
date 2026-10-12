@@ -1,0 +1,38 @@
+\subsection{Convolutional Neural Network (CNN) Accelerator Chip Design}
+\subsubsection{Control And Data Transfer Block - Khối điều khiển và truyền dữ liệu}
+\begin{itemize}
+    \item Khối này bao gồm một mô-đun giao diện ngoài, một mô-đun strobe dữ liệu, một bộ điều khiển và một mô-đun xử lý lệnh hoạt động.
+    \item Khối này chịu trách nhiệm quản lý luồng dữ liệu giữa các thành phần khác nhau của bộ tăng tốc, bao gồm cả việc đọc và ghi dữ liệu từ bộ nhớ trên chip.
+\end{itemize}
+\subsubsection{Data Processing Block - Khối xử lý dữ liệu}
+\begin{itemize}
+    \item Bao gồm mô-đun tính toán tích chập sử dụng mạng tính toán nhân-tích lũy (MA) dựa trên mảng systolic.
+    \item Mô-đun này thực hiện việc tính toán của lớp tích chập, lớp pooling và lớp được kết nối đầy đủ.
+\end{itemize}
+\subsubsection{On-Chip Memory Block - Khối bộ nhớ trên chip}
+\begin{itemize}
+    \item Lưu trữ các loại dữ liệu khác nhau như địa chỉ, dữ liệu pixel, dữ liệu nhân tích chập, trọng số, kết quả tính toán trung gian và kết quả tính toán cuối cùng.
+    \item Bộ nhớ này được tổ chức thành các thanh ghi khác nhau, mỗi thanh ghi được thiết kế để lưu trữ một loại dữ liệu cụ thể như bảng bên dưới
+\end{itemize}
+\subsubsection{Mảng Systolic - Systolic Array}
+Thiết kế của mảng systolic được thể hiện ở hình bên dưới:\\
+\\
+\begin{itemize}
+    \item Đây là thành phần cốt lõi của mô-đun tính toán tích chập, chịu trách nhiệm thực hiện các phép tính tích chập một cách hiệu quả
+    \item Mảng systolic được cấu tạo từ các mô-đun xử lý nhỏ (PE) được kết nối với nhau theo cấu trúc lưới.
+    \item Mỗi PE thực hiện một phép nhân và cộng đơn giản, và dữ liệu được truyền qua mảng theo kiểu đường ống, cho phép tái sử dụng dữ liệu cao và giảm thiểu truy cập bộ nhớ.
+    \item Mảng systolic cho phép tính toán song song và đường ống, tăng tốc đáng kể quá trình tính toán tích chập.
+\end{itemize}
+\subsubsection{Kiểm Tra và Xác Minh}
+\textbf{Mô-đun Tính Toán Tích Chập}
+\begin{itemize}
+    \item Đơn vị xử lý (PE): Trong quá trình kiểm tra, các đầu vào của Xin, Win và Sin thay đổi 5 lần, tạo ra 5 kết quả đầu ra khác nhau. Biểu thức (10) trong tài liệu thể hiện logic của phép toán (10)
+    
+\end{itemize}
+\textbf{Mô-đun Pooling}
+\begin{itemize}
+    \item Sử dụng kỹ thuật pooling trung bình trên ma trận pixel đầu vào kích thước 5x5, được định nghĩa trong biểu thức (13)
+    \item Biểu đồ thời gian mô phỏng của mô-đun pooling được thể hiện ở hình bên dưới:
+    \item Sau khi xử lý bởi mảng systolic, đầu vào nối tiếp được chuyển đổi thành đầu ra song song, các thanh ghi P11 đến P33 trong dưới lưu trữ 9 dữ liệu trong mỗi cửa sổ 3x3 của ma trận, được xuất ra song song.
+    \item Bộ đếm t được sử dụng để trích xuất kết quả pooling, và data-out là kết quả pooling cuối cùng.
+\end{itemize}
