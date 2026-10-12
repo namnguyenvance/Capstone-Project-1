@@ -61,20 +61,23 @@ module tb;
     // Timeout watchdog (TinyMobileNet is more complex, give more time)
     initial begin
         #500000000000; // 500ms @ 100MHz = long enough for inference
-        $display("\n\n*** TIMEOUT ***");
-        $finish;
+        $fatal(1, "TEST FAILURE: inference timeout");
     end
 
     // Monitor LEDs for completion
     always @(posedge clk) begin
+        if (resetn && uut.cpu.trap === 1'b1)
+            $fatal(1, "TEST FAILURE: CPU trap");
+        if (leds == 8'hEE)
+            $fatal(1, "TEST FAILURE: firmware configuration or reference label");
         if (leds == 8'hAA) begin
             #10000;
-            $display("\n\n*** SUCCESS: All tests passed (LEDs = 0xAA) ***");
+            $display("\n\n*** INFERENCE COMPLETED: All predictions correct (LEDs = 0xAA) ***");
             $finish;
         end
         if (leds == 8'hFF) begin
             #10000;
-            $display("\n\n*** DONE: Some tests may have failed (LEDs = 0xFF) ***");
+            $display("\n\n*** INFERENCE COMPLETED: Incorrect predictions; not an implementation verdict (LEDs = 0xFF) ***");
             $finish;
         end
     end

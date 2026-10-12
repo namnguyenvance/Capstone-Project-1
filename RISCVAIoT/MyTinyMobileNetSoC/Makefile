@@ -1,4 +1,4 @@
-# TinyMobileNet CIFAR-10 on PicoRV32 SoC
+# TinyMobileNet MNIST on PicoRV32 SoC
 # Compiler and tool definitions
 TOOLCHAIN_PREFIX = riscv32-unknown-elf-
 CC      = $(TOOLCHAIN_PREFIX)gcc
@@ -8,6 +8,9 @@ VVP      = vvp
 
 # Compile flags for RISC-V 32-bit (base integer + multiply, no float, no compressed)
 CFLAGS = -mabi=ilp32 -march=rv32im -ffreestanding -nostdlib -O2
+# Changing this value requires a forced firmware rebuild, e.g.:
+# make -B firmware.hex TEST_IMAGE_COUNT=10
+TEST_IMAGE_COUNT ?= 1
 
 # Source files
 C_SOURCES = main_tinymobilenet.c dl_ops.c quantize.c tinymobilenet_model_data.c
@@ -18,7 +21,7 @@ all: sim
 
 # 1. Compile C and Assembly firmware into ELF
 firmware.elf: start.s $(C_SOURCES) tinymobilenet_model_data.h mnist_test_images.h
-	$(CC) $(CFLAGS) -T sections.lds -o firmware.elf start.s $(C_SOURCES)
+	$(CC) $(CFLAGS) -DTINYMOBILENET_TEST_COUNT=$(TEST_IMAGE_COUNT) -T sections.lds -o firmware.elf start.s $(C_SOURCES)
 
 # 2. Convert ELF to Verilog Hex file
 firmware.hex: firmware.elf

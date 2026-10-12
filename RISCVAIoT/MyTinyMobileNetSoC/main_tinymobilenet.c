@@ -19,6 +19,16 @@
 #define REG_LEDS      (*(volatile unsigned char*)0x03000000)
 #define REG_UART_DATA (*(volatile unsigned int*) 0x02000008)
 
+/* Override at compile time; the default keeps the short one-image RTL run.
+ * LEDs: 0x01 running, 0xAA completed/all predictions correct,
+ * 0xFF completed/one or more predictions incorrect, 0xEE test configuration
+ * or label failure. Classification correctness is not implementation proof;
+ * the testbench reports CPU traps and timeouts separately as test failures.
+ */
+#ifndef TINYMOBILENET_TEST_COUNT
+#define TINYMOBILENET_TEST_COUNT 1
+#endif
+
 /* MNIST class names */
 const char* const class_names[] = {
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
@@ -174,9 +184,23 @@ int main() {
     print("Architecture: Conv2D -> [DWConv+PWConv]x3 -> GAP -> FC\n\n");
 
     int total_passed = 0;
+    int tested_count = 0;
+    const int test_count = TINYMOBILENET_TEST_COUNT;
 
-    // Limit to 1 image for hardware simulation to save time
-    for (int img_idx = 0; img_idx < 1; img_idx++) {
+    if (test_count < 1 || test_count > number_of_test ||
+        test_count > (int)(sizeof(test_images) / sizeof(test_images[0])) ||
+        test_count > (int)(sizeof(test_labels) / sizeof(test_labels[0]))) {
+        print("TEST FAILURE: invalid configured image count\n");
+        REG_LEDS = 0xEE;
+        return 1;
+    }
+
+    for (int img_idx = 0; img_idx < test_count; img_idx++) {
+        if (test_labels[img_idx] < 0 || test_labels[img_idx] >= 10) {
+            print("TEST FAILURE: invalid reference label\n");
+            REG_LEDS = 0xEE;
+            return 1;
+        }
         print("=== Image ");
         print_dec(img_idx);
         print(" (Target: ");
@@ -357,21 +381,30 @@ int main() {
 
         if (predicted == test_labels[img_idx]) {
             total_passed++;
+            print("  Prediction: CORRECT\n");
+        } else {
+            print("  Prediction: INCORRECT\n");
         }
+        tested_count++;
     }
 
     print("========================================\n");
     print("FINAL RESULT: ");
     print_dec(total_passed);
     print("/");
-    print_dec(number_of_test);
+    print_dec(tested_count);
     print(" correct\n");
+    print("INFERENCE COMPLETED: ");
+    print_dec(tested_count);
+    print(" images; incorrect: ");
+    print_dec(tested_count - total_passed);
+    print("\n");
 
-    if (total_passed == number_of_test) {
-        print("--> TinyMobileNet Classification SUCCESS!\n");
+    if (total_passed == tested_count) {
+        print("--> All predictions correct.\n");
         REG_LEDS = 0xAA;
     } else {
-        print("--> TinyMobileNet Classification PARTIAL.\n");
+        print("--> Completed with incorrect predictions (not an implementation verdict).\n");
         REG_LEDS = 0xFF;
     }
 
