@@ -1,106 +1,12 @@
-\section{Khảo sát RISC-V core}
-RISC-V là một kiến trúc tập lệnh (ISA) mã nguồn mở, cho phép các nhà thiết kế phần cứng và phần mềm tự do phát triển các hệ thống tùy chỉnh. Dưới đây là khảo sát một số core RISC-V tiêu biểu, phổ biến trong cả nghiên cứu và ứng dụng công nghiệp.
+\section{Lõi RISC-V gọn nhẹ và tích hợp bộ tăng tốc}
+\subsection{PicoRV32 và giao tiếp bus gốc}
+PicoRV32 là lõi RISC-V hướng tới diện tích nhỏ, có các lựa chọn giao tiếp bộ nhớ gốc, AXI4-Lite và Wishbone. Lõi thực hiện lệnh qua nhiều chu kỳ, không phải lõi đơn chu kỳ; thời gian còn phụ thuộc cấu hình và đáp ứng của bộ nhớ. Giao tiếp gốc dùng cơ chế valid/ready, phù hợp để kết nối RAM và ngoại vi qua bộ giải mã địa chỉ~\cite[README: Variants; PicoRV32 Native Memory Interface; Cycles per Instruction]{YosysHQ2024}.
 
-\subsection{PicoRV32}
-PicoRV32 là một lõi vi xử lý RISC-V 32-bit, được thiết kế nhỏ gọn và đơn giản, tối ưu cho các ứng dụng nhúng và hệ thống FPGA. Lõi này nổi bật với hiệu suất đủ dùng và khả năng tiết kiệm tài nguyên.
+Trong MyTinyMobileNetSoC, lựa chọn có ý nghĩa là giữ CPU làm chủ giao dịch và đưa các phép tính ra ngoại vi MMIO. Firmware dùng lệnh tải/lưu thông thường để nạp thanh ghi, khởi phát tính toán và đọc kết quả; không sử dụng giao diện lệnh đồng xử lý PCPI cho các toán tử CNN. Kiến trúc này cho phép quan sát rõ chi phí phục vụ dữ liệu, nhưng mỗi toán hạng phải đi qua CPU. RAM dùng chung chứa mã và tensor không đồng nghĩa ngoại vi được quyền tự đọc RAM, như sẽ mô tả ở Chương~\ref{chap:kientruc}.
 
-\noindent PicoRV32 hỗ trợ các tập lệnh:
-\begin{itemize}
-    \item Các tập lệnh bao gồm RV32I, RV32M và RV32C.
-    \item Có thể được cấu hình thành các lõi RV32E, RV32I, RV32IC, RV32IM hoặc RV32IMC.
-\end{itemize}
+Tài liệu PicoRV32 công bố tài nguyên và tần số cho những cấu hình lõi cụ thể~\cite[README: Features; Performance]{YosysHQ2024}. Những kết quả đó không đại diện cho SoC có RAM, bộ giải mã và các datapath CNN. Do đó, luận văn đánh giá tài nguyên và timing của toàn bộ thiết kế sau định tuyến ở Chương~\ref{chap:toiuu}, thay vì áp thông số lõi độc lập cho hệ thống tích hợp.
 
-\noindent Thông số kỹ thuật phần cứng:
-\begin{itemize}
-    \item Tùy thuộc vào cấu hình, PicoRV32 sử dụng khoảng 750-2000 LUTs trên kiến trúc Xilinx 7-Series FPGA.
-    \item  PicoRV32 có thể đạt tốc độ xung nhịp từ 250 đến 450 MHz trên các FPGA thuộc dòng Xilinx 7-Series.
-    \item Hỗ trợ giao diện bộ nhớ gốc hoặc tùy chọn giao diện AXI4-Lite master, cho phép tích hợp dễ dàng vào các hệ thống hiện có.
-    \item Có tùy chọn sử dụng bộ điều khiển ngắt đơn giản, cho phép xử lý các sự kiện từ bên ngoài.
-    \item Tích hợp tùy chọn giao diện bộ đồng xử lý, cho phép mở rộng chức năng của CPU thông qua các lệnh không nhánh.
-\end{itemize}
-PicoRV32 sử dụng kiến trúc đơn chu kỳ (\textit{single-cycle}) trong cấu hình mặc định. Với chế độ pipeline, lõi này có các giai đoạn sau:
-\begin{itemize}
-    \item \textit{Fetch (IF)}: Nạp lệnh từ bộ nhớ.
-    \item \textit{Decode (ID)}: Giải mã lệnh và đọc toán hạng.
-    \item \textit{Execute (EX)}: Thực hiện tính toán hoặc truy cập bộ nhớ.
-    \item \textit{Write-back (WB)}: Ghi kết quả trở lại thanh ghi.
-\end{itemize}
+\subsection{Rocket/RoCC như một phương án đối chiếu}
+Trong hệ sinh thái Rocket Chip, RoCC cho phép bộ tăng tốc nhận lệnh tùy chỉnh cùng toán hạng thanh ghi và trả kết quả về CPU. Bộ tăng tốc có thể dùng giao diện tới cache L1 hoặc kết nối TileLink tới hệ thống nhớ; lựa chọn đường truy cập ảnh hưởng thông lượng và độ phức tạp tích hợp~\cite{chipyardRoCC}. Cần phân biệt đường \emph{điều khiển} qua lệnh RoCC với đường \emph{dữ liệu} qua cache hoặc cổng nhớ: có RoCC không tự động có nghĩa mọi thiết kế đều dùng cùng một cơ chế DMA.
 
-\noindent \textbf{Nhận xét:} PicoRV32 là lựa chọn tối ưu cho các ứng dụng nhỏ gọn và tiết kiệm chi phí, đặc biệt trên FPGA có hạn chế tài nguyên. Mặc dù hiệu năng không cao như các lõi pipeline phức tạp, nó đáp ứng tốt cho các hệ thống nhúng và các ứng dụng yêu cầu đơn giản.
-
-
-
-\subsection{Rocket Core}
-Rocket Core là bộ xử lý scalar được phát triển tại Đại học California, Berkeley (UC Berkeley). Nó hỗ trợ kiến trúc RISC-V với các biến thể RV32G và RV64G, được viết bằng ngôn ngữ Chisel (HDL), một ngôn ngữ phần cứng dựa trên Scala. Rocket Core cung cấp khả năng tùy chỉnh cao, bao gồm việc kích hoạt các mở rộng ISA như M (Multiply/Divide), A (Atomic), F (Floating-Point), và D (Double Precision). 
-\\
-
-\noindent Rocket Core hỗ trợ các biến thể ISA của RISC-V bao gồm:
-\begin{itemize}
-    \item \textit{RV64G và RV32G}: Các biến thể 64-bit và 32-bit của kiến trúc RISC-V.
-    \item \textit{M, A, F, D}: Các mở rộng tùy chọn của RISC-V, bao gồm Multiply/Divide, Atomic, Floating-point, và Double Precision.
-\end{itemize}
-Thông số kỹ thuật:
-\begin{itemize}
-    \item  Rocket Core có thể hoạt động với tốc độ lên tới 1 GHz (1000 MHz), tùy vào cấu hình và ứng dụng.
-    \item Hiệu suất của Rocket Core là 1.72 DMIPS/MHz, đánh giá dựa trên các bài toán tính toán số học.
-    \item Rocket Core được mô tả bằng ngôn ngữ Chisel, một ngôn ngữ phần cứng dựa trên Scala cho phép dễ dàng tùy chỉnh và mở rộng.
-    \item  Rocket Core hỗ trợ tính năng bộ xử lý đồng xử lý tùy chỉnh qua giao diện RoCC (Rocket Chip Coprocessor), hỗ trợ tăng tốc phần cứng cho các ứng dụng đặc biệt.
-\end{itemize}
-
-\noindent Rocket Core sử dụng pipeline 5 giai đoạn để xử lý các lệnh:
-\begin{itemize}
-    \item Instruction Fetch (IF)
-    \item Instruction Decode (ID)
-    \item Execute (EX)
-    \item Memory Access (MEM)
-    \item Writeback (WB)
-\end{itemize}
-Một số mô tả khác cho Rocket Core bao gồm một 6-stage pipeline với sự bổ sung của giai đoạn ‘pcgen’. Tuy nhiên, giai đoạn ‘pcgen’ này thực chất là một phần của các giai đoạn khác và không phải là một giai đoạn độc lập trong pipeline. Điều này giúp tối ưu hóa thiết kế nhưng không làm tăng độ phức tạp của pipeline. 
-
-\noindent \textbf{Nhận xét:} Rocket Core là một bộ xử lý RISC-V mạnh mẽ, nổi bật với khả năng tùy chỉnh cao, rất phù hợp cho các ứng dụng yêu cầu tính toán phức tạp và hiệu suất cao. Với pipeline 5 stage, Rocket Core tối ưu hóa tốc độ xử lý, giúp cải thiện hiệu suất tổng thể. Đặc biệt, giao diện RoCC cho phép tích hợp các bộ đồng xử lý tùy chỉnh, mở ra cơ hội cho việc sử dụng các bộ tăng tốc và phần cứng đặc thù. Tuy nhiên, để tối ưu hóa bộ xử lý và tận dụng các tính năng của nó, người dùng cần có sự hiểu biết sâu sắc về các yêu cầu phần cứng và phần mềm cụ thể.
-
-
-
-
-
-
-\subsection{CVA6(Ariane)}
-CVA6, hay còn gọi là Ariane, là bộ xử lý 64-bit in-order RISC-V với 6 stage. Bộ xử lý này hỗ trợ ba cấp độ đặc quyền M, S, U, giúp nó hoạt động giống như một hệ điều hành Unix đầy đủ. CVA6 được thiết kế để đáp ứng nhu cầu của các hệ thống nhúng và tính toán hiệu suất cao, với mục tiêu cung cấp một bộ xử lý mạnh mẽ và tiết kiệm năng lượng.\\
-CVA6 hộ trợ các biến thể ISA của RISC-V bao gồm:
-\begin{itemize}
-    \item CVA6 hỗ trợ đầy đủ các tập lệnh cơ sở RV64I cho 64-bit.
-    \item Các mở rộng hỗ trợ bao gồm RV64M (nhân chia số nguyên) và RV64C (lệnh nén).
-\end{itemize}
-
-\noindent Thông số kỹ thuật:
-\begin{itemize}
-    \item  Hỗ trợ dự đoán nhánh với bộ đệm nhánh, bảng lịch sử nhánh và ngăn xếp địa chỉ trả về.
-    \item  Có thể định cấu hình TLB riêng biệt và phần cứng PTW hỗ trợ bộ nhớ ảo.
-    \item  Đạt 2.08 CoreMark/MHz.
-    \item  112 MHz trên FPGA XCVU9P và 738 MHz trên ASIC 22FDX.
-    \item  0.52 mm\textsuperscript{2} trên công nghệ ASIC 22FDX.
-\end{itemize}
-
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=6in]{Images/Risc-V/Representation-of-the-CVA6-6-stage-pipeline-15.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Kiến trúc pipeline của CVA6 core}
-\end{figure}
-
-
-\noindent Pipeline của CVA6 bao gồm các giai đoạn sau:
-    \begin{itemize}
-        \item PC Generation
-        \item Instruction Fetch
-        \item Instruction Decode
-        \item Issue
-        \item Execute
-        \item Commit
-    \end{itemize}
-
-\noindent \textbf{Nhận xét:} CVA6 (Ariane) là bộ xử lý RISC-V mạnh mẽ và tiết kiệm năng lượng, hỗ trợ nhiều lệnh và có thể cấu hình linh hoạt, phù hợp cho nhiều ứng dụng. Với pipeline 6-stage và tính năng dự đoán nhánh, hỗ trợ bộ nhớ ảo, CVA6 mang lại hiệu suất cao và khả năng mở rộng tốt.
-
-
-
-
+Khác với phương án đó, MyTinyMobileNetSoC không mở rộng tập lệnh để điều khiển CNN và không có DMA ở các ngoại vi. Cách tiếp cận này đổi lại sự đơn giản của giao diện phần mềm bằng chi phí tải/lưu và điều phối trên PicoRV32. Ngược lại, khả năng chuyển khối dữ liệu của bộ đồng xử lý đòi hỏi thêm điều khiển bộ nhớ và bộ đệm. Vì vậy, lựa chọn CPU trong chương được xem xét cùng phương thức tích hợp; danh mục pipeline hay hiệu năng lõi riêng không đủ để lựa chọn kiến trúc tăng tốc.

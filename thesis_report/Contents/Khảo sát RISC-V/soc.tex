@@ -1,0 +1,68 @@
+\section{Tổng hợp so sánh và vị trí của MyTinyMobileNetSoC}
+\label{sec:related-position}
+Bảng~\ref{tab:related-integration} và Bảng~\ref{tab:related-scope} dùng cùng tập công trình để đối chiếu hai nhóm tiêu chí: tích hợp/luồng dữ liệu và phạm vi/số học. Các nhận xét ở cột cuối là tổng hợp kiến trúc của chương; chúng không biểu thị thứ hạng. Khi nguồn không xác định rõ một thuộc tính, bảng ghi giới hạn đó thay vì suy đoán từ tên nền tảng.
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}@{}}
+\caption{So sánh host, kiểu tăng tốc và truyền dữ liệu}\label{tab:related-integration}\\
+\toprule
+Công trình & CPU/host và kiểu tăng tốc & Điều khiển, truyền dữ liệu & Miền tái sử dụng chính \\
+\midrule
+\endfirsthead
+\toprule
+Công trình & CPU/host và kiểu tăng tốc & Điều khiển, truyền dữ liệu & Miền tái sử dụng chính \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Ge và cộng sự~\cite{ge2019compact} & Cortex-M3; chuỗi tích chập, kích hoạt, pooling & AHB tới accelerator; điều khiển và bank nhớ nội bộ & Buffer cửa sổ; chia sẻ nguồn giữa chuỗi; bank luân phiên giữ tổng riêng/kết quả \\
+\midrule
+He~\cite{he2021design} & Sơ đồ Rocket; GEMM/systolic giữ trọng số & RoCC điều khiển; DMA tới L2/DRAM & Trọng số tại PE; tile ma trận và lưu trữ cục bộ \\
+\midrule
+ConvAU~\cite{kiningham2016design} & Host không xác định lõi; mảng nhân ma trận đặc & Host nạp trọng số/metadata; không xác định giao thức bus SoC & Trọng số tại PE; FIFO đầu vào và đệm trung gian \\
+\midrule
+Chung~\cite{chung2021optimization} & Host OpenCL; kernel FPGA sinh từ TVM & Runtime, buffer toàn cục, hàng đợi; kênh giữa kernel khi pipeline & Tiling, lưu cục bộ, fusion và tái dùng kernel khi folded \\
+\midrule
+MyTiny\-Mobile\-NetSoC (Chương~\ref{chap:kientruc}) & PicoRV32; ngoại vi Conv, Depthwise, Pointwise, Quant & MMIO qua bus gốc; CPU chuyển toán hạng; không DMA; RAM mã/dữ liệu 256~KiB & Patch/tile và cache trọng số chuyên biệt, do firmware lập lịch theo shape \\
+\end{longtable}
+\endgroup
+
+\begingroup
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}@{}}
+\caption{So sánh số học, phạm vi đánh giá và khác biệt với luận văn}\label{tab:related-scope}\\
+\toprule
+Công trình & Số học & Phạm vi và bằng chứng & Khác biệt chính so với luận văn \\
+\midrule
+\endfirsthead
+\toprule
+Công trình & Số học & Phạm vi và bằng chứng & Khác biệt chính so với luận văn \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Ge và cộng sự~\cite{ge2019compact} & Fixed-point 10 bit; tổng riêng 32 bit & SoC FPGA; đánh giá LeNet-5 & Nhiều bước xử lý và buffering nằm trong accelerator; không xác nhận đường depthwise riêng \\
+\midrule
+He~\cite{he2021design} & Không nêu rõ độ rộng cấu hình đánh giá & FPGA; YOLOv3-tiny; phần kết luận nêu BOOM khác host trong sơ đồ & Tập trung nhân ma trận và DMA; không đủ chi tiết để đồng nhất cấu hình số học/host của số đo \\
+\midrule
+ConvAU~\cite{kiningham2016design} & Nhân 8 bit; tích lũy 32 bit & RTL và luồng ASIC; SqueezeNet lượng tử hóa & Ánh xạ CNN sang ma trận; phần cứng có ReLU/lượng tử hóa; không phải đánh giá SoC FPGA cùng điều kiện \\
+\midrule
+Chung~\cite{chung2021optimization} & Dấu phẩy động & OpenCL FPGA; LeNet-5, MobileNetV1, ResNet & Tối ưu trình biên dịch và runtime; không cấp toán hạng từng phép qua MMIO \\
+\midrule
+MyTiny\-Mobile\-NetSoC (Chương~\ref{chap:kientruc}, \ref{chap:toiuu}) & Tensor INT8; tích lũy INT32 & TinyMobileNet/MNIST; mô phỏng và đánh giá FPGA post-route cho ZCU106 & Tích hợp và lịch firmware theo workload; còn fallback CPU; chưa xác nhận suy luận trên bo mạch \\
+\end{longtable}
+\endgroup
+
+\subsection{Ranh giới tích hợp và phạm vi tối ưu được chọn}
+Từ các đối chiếu trên, lựa chọn của luận văn là một hệ thống mà trách nhiệm truyền dữ liệu còn tường minh ở CPU. PicoRV32 đọc tensor từ RAM dùng chung, nạp các thanh ghi ngoại vi và thu kết quả. RAM 256~KiB là bộ nhớ chung cho mã và dữ liệu của CPU; các bộ tăng tốc không có cổng tự truy cập RAM. Conv, Depthwise, Pointwise và Quant là các đường được firmware sử dụng; SoC còn có bộ nhân độc lập nhưng đường suy luận hiện tại không sử dụng nó (Chương~\ref{chap:kientruc}).
+
+Phạm vi tăng tốc không bao phủ mọi phép toán của mạng. Trong thiết kế cuối, Conv0, DW1, DW2 và các lớp Pointwise có đường tích lũy phần cứng; DW3, GAP và FC vẫn dùng số học CPU. Requantization dùng ngoại vi Quant, còn CPU chịu trách nhiệm bias, offset đầu ra, clamp và điều phối lớp. Trọng số và feature map là INT8, bias và tích lũy là INT32; điều đó không tự xác nhận tương đương từng bit với các hệ lượng tử hóa khác. Phân công cụ thể được làm rõ trong Chương~\ref{chap:kientruc}, tránh đồng nhất tên ngoại vi với mức bao phủ toàn bộ toán tử.
+
+So với bộ đồng xử lý DMA hoặc mảng GEMM chung, phạm vi tối ưu ở đây tập trung vào giao dịch MMIO, lịch vòng lặp và lưu giữ dữ liệu theo shape của TinyMobileNet. Đổi lại, việc chuyên biệt hóa cần điều kiện chọn nhánh, fallback và kiểm tra giao dịch tương ứng. Kết quả được đánh giá bằng điểm số/dự đoán, số chu kỳ và tài nguyên/timing post-route trên mục tiêu ZCU106 ở Chương~\ref{chap:toiuu}. Flow hiện có chưa xác nhận suy luận TinyMobileNet trên bo mạch và chưa có số đo năng lượng để đối chiếu các công trình trước.
+
+Các nghiên cứu được giữ lại làm rõ những lựa chọn đã có về phân công, lưu trữ và lập lịch; chúng không đủ cơ sở để khẳng định tính mới hoặc ưu thế phổ quát của MyTinyMobileNetSoC. Vị trí của đề tài là hiện thực và đánh giá một phương án tích hợp cụ thể, trong đó hiệu năng phụ thuộc đồng thời vào datapath chuyên biệt và cách CPU phục vụ dữ liệu. Từ những lựa chọn này, Chương~\ref{chap:kientruc} trình bày kiến trúc được chọn, giao diện MMIO và đường suy luận thực tế của hệ thống.

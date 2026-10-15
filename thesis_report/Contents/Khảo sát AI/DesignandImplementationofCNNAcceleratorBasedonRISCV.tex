@@ -1,75 +1,12 @@
-\subsection{Design and Implementation of Convolutional Neural Network Accelerator Based on RISCV}
-\subsubsection{Phân tích tăng tốc mạng nơ-ron tích chập}
-Trong mạng nơ-ron tích chập, hoạt động tốn thời gian nhất là hoạt động tích chập, chiếm gần 90\% thời gian của mạng nơ-ron. Do đó, việc nghiên cứu tăng tốc mạng nơ-ron tích chập chủ yếu tập trung vào việc tăng tốc hoạt động tích chập.\\
-Một số phương pháp tăng tốc phép tích chập:
-\begin{itemize}
-    \item Thay đổi thứ tự lồng vòng lặp: Hoàn thành tính toán tải một lần, cải thiện tỷ lệ sử dụng lại dữ liệu và giảm số lần truy cập bộ nhớ.
-    \item Mở rộng vòng lặp: Sử dụng dữ liệu cơ bản độc lập với nhau, thực hiện tính toán song song.
-\end{itemize}
-\paragraph{Cây cộng - Addition tree}
-Kiến trúc của addition tree được thể hiện ở hình bên dưới:
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/addition_tree.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Kiến trúc của cây cộng}
-\end{figure}
-\begin{itemize}
-    \item Là một phương pháp tăng tốc phần cứng điển hình cho việc mở rộng vòng lặp.
-    \item Mở rộng nhân tích chập và thực hiện 8 phép tích chập của 4 nhân tích chập cùng một lúc.
-    \item Giảm vòng lặp kép bằng cách tăng đơn vị tính toán, tốc độ tăng tốc lý thuyết là 8.
-    \item Nhược điểm: tăng nhu cầu về tài nguyên phần cứng, dữ liệu không được sử dụng đầy đủ do tính toán song song, cần tải lại sau mỗi lần chạy, tăng yêu cầu băng thông.
-\end{itemize}
-\paragraph{Tối ưu hóa GEMM - General Matrix Multiplication}
-\begin{itemize}
-    \item Chia đầu ra thành các khối con 4x4 để cải thiện việc sử dụng lại dữ liệu.
-    \item Tối ưu hóa bằng cách sử dụng một số lượng lớn thanh ghi, giảm truy cập bộ nhớ, loại bỏ tính toán con trỏ, sắp xếp lại bộ nhớ để làm cho địa chỉ liên tục.
-    \item Đạt được hiệu suất cải thiện 7 lần.
-\end{itemize}
-\paragraph{Mảng systolic - Systolic Array}
-Kiến trúc của mảng systolic được thể hiện ở hình bên dưới:
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/systolic_array.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Kiến trúc của mảng systolic}
-\end{figure}
-\begin{itemize}
-    \item Trọng số được cố định trong mỗi đơn vị tính toán cơ bản, dữ liệu đầu vào chảy qua mỗi đơn vị tính toán, đạt được mục đích sử dụng lại dữ liệu đầu vào.
-    \item Mảng systolic với trọng số cố định yêu cầu K2 phép nhân và K2-1 phép cộng để tính toán một nhân tích chập có kích thước K.
-    \item Giảm đáng kể số chu kỳ cần thiết để thực hiện hoạt động tích chập.
-\end{itemize}
-\subsubsection{Thiết kế bộ tăng tốc}
-\textbf{Phương pháp}: Bộ tăng tốc mạng nơ-ron tích chập được thiết kế trong bài sử dụng phương pháp mảng systolic cố định trọng số được tối ưu hóa GEMM, kết hợp tối ưu hóa GEMM với mảng systolic cố định trọng số.\\
-Kiến trúc tổng quát của bộ tăng tốc được thể hiện ở hình bên dưới:
-\begin{figure}[!h]
-    \centering
-    \includegraphics[height=6.3cm,width=0.7\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/accelerator_architecture.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Kiến trúc tổng quát của hệ thống}
-\end{figure}
-\begin{itemize}
-    \item Bao gồm bộ tăng tốc được kết nối với RocketCore thông qua ROCC.
-    \item Bộ tăng tốc truy cập L2Cache và Dram thông qua mô-đun DMA để đọc và ghi lại dữ liệu bản đồ đặc trưng.
-    \item Bộ tăng tốc bao gồm ba phần: mô-đun điều khiển, mô-đun tính toán và mô-đun bộ nhớ cache.
-\end{itemize}
-Mô-đun tính toán ma trận được thể hiện ở hình bên dưới:
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=\textwidth]{Images/CNNAccelerator/DesignandImplementationofCNNAcceleratorBasedonRISCV/matrix_mul.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Mô-đun tính toán ma trận}
-\end{figure}
-\begin{itemize}
-    \item Đơn vị số học cơ bản PE chịu trách nhiệm hoàn thành phép nhân và cộng đơn giản, trong đó thanh ghi bộ đệm trọng số được đặt để cố định giá trị trọng số.
-    \item Các đơn vị số học PE cơ bản cùng nhau tạo thành đơn vị số học cơ bản Tile trong GEMM, sau đó được kết nối để tạo thành toàn bộ mảng systolic.
-    \item Các thanh ghi được đặt giữa các tile - một đơn vị tính toán cơ bản trong mô-đun tính toán ma trận của bộ tăng tốc, để tổ chức đường ống tile cho tính toán xung.
-\end{itemize}
-\subsubsection{Đánh giá và kết luận}
-Hiệu suất của bộ tăng tốc được đánh giá qua hai bước chính:
-\begin{itemize}
-    \item Tổng hợp và kiểm tra: Đầu tiên, tổng hợp mã của bộ tăng tốc mạng nơ-ron tích chập trên nền tảng Rocket-Chip. Sau đó tiến hành kiểm tra mức tiêu thụ điện năng và tài nguyên phần cứng của bộ tăng tốc.
-    \item Triển khai và đánh giá trực tiếp: kết nối bộ tăng tốc với bảng phát triển Genesys2 thông qua giao tiếp JTAG. Bằng cách sử dụng FPGA truy cập vào bộ nhớ DDR để ghi chương trình kiểm tra, dữ liệu bản đồ đặc trưng và trọng số của mô hình YOLOv3-tiny. Cuối cùng, bộ tăng tốc được kích hoạt để xử lý dữ liệu và kết quả được phân tích.
-\end{itemize}
-Kết quả phân tích cho thấy bộ tăng tốc có thể xử lý hình ảnh với tốc độ 0.024 giây/hình, tương đương 42 khung hình/giây (fps). Tài liệu cũng so sánh bộ tăng tốc này với một nghiên cứu khácvà nhận thấy bộ tăng tốc của họ tiêu tốn nhiều tài nguyên phần cứng hơn do sử dụng lõi kép BOOM 64-bit.
+\section{Kiến trúc tăng tốc CNN gắn với RISC-V}
+\subsection{RoCC, DMA và tổ chức GEMM}
+Nghiên cứu của He là đối chiếu chính về đường tích hợp CPU--accelerator. Phần kiến trúc mô tả Rocket Core kết nối bộ tăng tốc qua RoCC; bộ tăng tốc dùng DMA để đọc/ghi feature map qua L2 cache và DRAM. Khối điều khiển, khối tính toán và khối lưu trữ cục bộ cho phép phân biệt việc phát lệnh của CPU với di chuyển dữ liệu của phần cứng~\cite[Section~3, Figure~4]{he2021design}. Khác với cơ chế này, trong MyTinyMobileNetSoC, CPU phải đọc tensor rồi ghi toán hạng qua MMIO; ngoại vi không có đường DMA tới RAM.
 
+Khối tính toán của He kết hợp GEMM với mảng systolic giữ trọng số tại các phần tử xử lý (weight-stationary). Các PE hợp thành tile; thanh ghi giữa các tile tổ chức đường ống. Trọng số được nạp trước rồi dùng với luồng đầu vào, trong khi chia khối phép nhân ma trận nhằm giảm truy cập lặp~\cite[Sections~2.2--3, Figure~5]{he2021design}. Phạm vi mô tả tập trung vào tăng tốc tích chập bằng tính toán ma trận; sơ đồ có khối activation/pooling, nhưng bài không mô tả đủ để xác nhận một đường depthwise chuyên biệt hoặc toàn bộ hậu xử lý giống firmware của luận văn.
+
+Đặt cạnh thiết kế này, Conv/Depthwise/Pointwise của MyTinyMobileNetSoC biểu diễn các phép tính theo cấu trúc toán tử thay vì một mảng GEMM chung. Firmware quyết định khi nào giữ patch, nạp trọng số và sử dụng kết quả cho từng shape. Phương án ma trận có thể dùng chung lõi tính toán cho nhiều lớp, đổi lại yêu cầu ánh xạ tensor và cấp dữ liệu đủ đều. Phương án chuyên biệt giảm nhu cầu ánh xạ qua ma trận trong đường chạy hiện tại, nhưng có phạm vi shape và các nhánh fallback phải kiểm chứng. Hai cách tổ chức đặt sự phức tạp ở những vị trí khác nhau.
+
+\subsection{Giới hạn bằng chứng và ý nghĩa đối chiếu}
+Phần thực nghiệm của He sử dụng YOLOv3-tiny và báo cáo thời gian xử lý trên nền tảng FPGA~\cite[Section~4]{he2021design}. Tuy nhiên, sơ đồ kiến trúc ghi Rocket Core còn phần kết luận nêu BOOM hai lõi. Vì thế, chương chỉ dùng Rocket/RoCC để chỉ phương án kết nối được mô tả, không coi đây là cấu hình host đã được xác nhận nhất quán cho toàn bộ số đo. Bài cũng không công bố rõ độ rộng toán hạng và tích lũy của cấu hình đánh giá, nên không gán INT8/INT32 cho thiết kế này.
+
+Sự khác nhau về workload, host và hệ thống nhớ không cho phép xếp hạng từ FPS được báo cáo. Giá trị đối chiếu nằm ở mức tự chủ: với DMA, CPU có thể giao tác vụ có kích thước lớn hơn cho accelerator; với MMIO do CPU cấp dữ liệu, chi phí mỗi lần gọi và lượng dữ liệu hữu ích mỗi giao dịch trở thành mục tiêu tối ưu trực tiếp. Đây là cơ sở để Chương~\ref{chap:kientruc} làm rõ ranh giới giao diện và Chương~\ref{chap:toiuu} đánh giá cả phần truyền dữ liệu của MyTinyMobileNetSoC.

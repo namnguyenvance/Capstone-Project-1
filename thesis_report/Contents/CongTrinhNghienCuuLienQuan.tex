@@ -1,4 +1,22 @@
 \chapter{CÔNG TRÌNH NGHIÊN CỨU LIÊN QUAN}
+\label{chap:lienquan}
+Chương này đối chiếu các phương án tích hợp CPU và bộ tăng tốc CNN để làm rõ lựa chọn kiến trúc MyTinyMobileNetSoC. Trọng tâm là phân công công việc, đường truyền dữ liệu và nơi tái sử dụng toán hạng, thay vì liệt kê đặc tính của từng lõi hoặc từng khối phần cứng. Phạm vi hệ thống của luận văn được xác định ở Chương~\ref{chap:gioithieu}; kiến trúc và kết quả tối ưu tương ứng được trình bày ở Chương~\ref{chap:kientruc} và Chương~\ref{chap:toiuu}.
+
+\section{Tiêu chí so sánh và các phương án kiến trúc}
+\label{sec:related-criteria}
+Một bộ tăng tốc có nhiều đơn vị nhân--cộng chưa đủ bảo đảm suy luận nhanh nếu việc chuẩn bị và chuyển toán hạng chiếm nhiều thời gian. Vì vậy, chương sử dụng các tiêu chí sau để đặt các công trình trên cùng một khung phân tích:
+\begin{enumerate}
+    \item \textbf{Phân công CPU/phần cứng:} CPU chỉ khởi phát một tác vụ lớn hay còn dựng cửa sổ, cấp toán hạng, cộng bias và hoàn thiện từng đầu ra?
+    \item \textbf{Điều khiển và truyền dữ liệu:} lệnh tùy chỉnh, thanh ghi MMIO, DMA, cache hay runtime đảm nhiệm phần nào; bộ tăng tốc có tự truy cập bộ nhớ hay không?
+    \item \textbf{Phạm vi toán tử và số học:} tích chập chuẩn, depthwise, pointwise, FC, pooling và lượng tử hóa được hỗ trợ tới đâu; độ rộng tensor và tích lũy có tương đồng không?
+    \item \textbf{Tái sử dụng và bộ nhớ:} trọng số, cửa sổ đầu vào và tổng riêng được giữ ở đâu; lịch tính toán cần bộ đệm, băng thông và dung lượng lưu trữ nào?
+    \item \textbf{Bằng chứng đánh giá:} workload, đối chứng và ranh giới đo là gì; kết quả đến từ mô phỏng, hiện thực vật lý hay đo trên bo mạch?
+\end{enumerate}
+
+Theo các tiêu chí này, có thể đối chiếu ba hướng: ngoại vi tính toán do CPU cấp dữ liệu; bộ đồng xử lý nhận lệnh và chủ động chuyển dữ liệu qua hệ thống nhớ; và các kernel FPGA do trình biên dịch/runtime điều phối. Ge và cộng sự cung cấp trường hợp SoC với bộ đệm chuyên dụng~\cite[Sections~3--4]{ge2019compact}; He minh họa tích hợp RoCC cùng DMA~\cite[Section~3]{he2021design}; Chung khảo sát tổ chức kernel và lịch thực thi OpenCL~\cite[Chapters~3--5]{chung2021optimization}. Các hướng này là những lựa chọn về mức tự chủ và chi phí tích hợp, không tạo thành thứ hạng hiệu năng chung.
+
+Các bảng cuối chương chỉ tổng hợp đặc điểm có thể đối chiếu. Số liệu khác workload, độ chính xác số học hoặc công nghệ hiện thực không được dùng để suy ra ưu thế của MyTinyMobileNetSoC. Đặc biệt, thông lượng nhân ma trận cực đại không đồng nghĩa độ trễ của cả mạng, còn số chu kỳ mô phỏng không thay thế phép đo thời gian và năng lượng trên bo mạch.
+
 \input{Contents/Khảo sát RISC-V/core}
-\input{Contents/Khảo sát RISC-V/soc}
 \input{Contents/Khảo sát AI/CongTrinh}
+\input{Contents/Khảo sát RISC-V/soc}
