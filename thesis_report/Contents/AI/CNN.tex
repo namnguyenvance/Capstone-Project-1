@@ -1,103 +1,59 @@
-\subsection{Mạng nơ-ron tích chập (Convolutional Neural Network)}
-\subsubsection{Tổng quan}
-Trong lĩnh vực học sâu, mạng nơ-ron tích chập (CNN) là một trong những thuật toán nổi tiếng và được sử dụng phổ biến nhất. Lợi ích chính của CNN so với các thuật toán tiền nhiệm là khả năng tự động nhận diện các đặc trưng liên quan mà không cần sự giám sát của con người. CNN đã được áp dụng rộng rãi trong nhiều lĩnh vực khác nhau, bao gồm thị giác máy tính, xử lý giọng nói, nhận diện khuôn mặt,... Cấu trúc của CNN được lấy cảm hứng từ các nơ-ron trong não bộ của con người và động vật, tương tự như mạng nơ-ron truyền thống.\\
-Lợi ích của việc sử dụng mạng nơ-ron tích chập:
-\begin{itemize}
-    \item Chia sẻ trọng số (Weight Sharing): Lý do chính để sử dụng CNN là tính năng chia sẻ trọng số, giúp giảm số lượng tham số cần huấn luyện trong mạng, từ đó cải thiện khả năng khái quát hóa của mạng và tránh hiện tượng quá khớp (overfitting).
-    \item Học đồng thời các lớp trích xuất đặc trưng và lớp phân loại: Quá trình học đồng thời này làm cho đầu ra của mô hình vừa có tính tổ chức cao vừa phụ thuộc chặt chẽ vào các đặc trưng đã được trích xuất.
-    \item Dễ dàng triển khai mạng quy mô lớn: Việc triển khai các mạng quy mô lớn trở nên dễ dàng hơn rất nhiều với CNN so với các mạng nơ-ron khác.
-\end{itemize}
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/cnn_example.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Một ví dụ về kiến trúc CNN dùng cho phân loại hình ảnh}
-\end{figure}
-\subsubsection{Thành phần của mạng nơ-ron tích chập}
-\paragraph{Convolutional Layer} 
-Trong kiến trúc CNN, thành phần quan trọng nhất là lớp tích chập. Lớp này bao gồm một tập hợp các bộ lọc tích chập (gọi là các kernel). Hình ảnh đầu vào, được biểu diễn dưới dạng ma trận N chiều, sẽ được tích chập với các bộ lọc này để tạo ra bản đồ đặc trưng (feature map).\\
-Trong lớp này, nhiều bộ lọc tích chập có cùng kích thước được áp dụng, với mỗi bộ lọc được thiết kế để phát hiện các mẫu cụ thể trong hình ảnh, chẳng hạn như cạnh, đường cong hoặc hình dạng tổng thể của các đối tượng như chữ số.
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/conv_example.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Một ví dụ về lớp tích chập}
-\end{figure}
-\\
-Phép tích chập tại điểm $i,j$ được định nghĩa như sau:
+\section{Tích chập, stride, padding và kích hoạt}
+\subsection{Tích chập nhiều kênh}
+Xét đầu vào $X$ kích thước $C_{\rm in}\times H\times W$ và đầu ra $Y$ có $C_{\rm out}$ kênh. Mỗi kênh đầu ra $o$ có trọng số $W_{o,c,u,v}$ kích thước $C_{\rm in}\times K_h\times K_w$ và bias $b_o$. Với stride $s_h,s_w$ và padding trên/trái $p_t,p_l$, kết quả trước kích hoạt là
 \begin{equation}
-    y(i, j) = (I \times K)(i, j) + b = \sum_{m}^{F}\sum_{n}^{F}I(i + m, j + n)K(m, n) + b
+ Y_{o,y,x}=b_o+\sum_{c=0}^{C_{\rm in}-1}\sum_{u=0}^{K_h-1}\sum_{v=0}^{K_w-1}
+ W_{o,c,u,v}X_{c,s_hy+u-p_t,s_wx+v-p_l}.
 \end{equation}
-\begin{itemize}
-    \item $ y(i, j)$: Giá trị đầu ra tại vị trí $(i,j)$ trong bản đồ đặc trưng (feature map).
-    \item  $\displaystyle \sum_{m}^{F}\sum_{n}^{F}$: Phép tổng kép thực hiện lặp qua chiều cao $m$ và chiều rộng $n$ của kernel.
-    \item $I(i + m, j + n)$: Giá trị đầu vào từ ma trận đầu vào tại vị trí $(i + m, j + n)$.
-    \item $K(m, n)$: Giá trị của kernel tại vị trí $(m, n)$.
-    \item $b$: Tham số bias được thêm vào kết quả tích chập.
-\end{itemize}
-\paragraph{Pooling Layer}
-Nhiệm vụ chính của lớp pooling là thực hiện lấy mẫu phụ (sub-sampling) trên các bản đồ đặc trưng (feature maps). Các bản đồ này được tạo ra từ các phép tích chập trước đó. Nói cách khác, phương pháp này thu nhỏ kích thước lớn của bản đồ đặc trưng để tạo ra các bản đồ đặc trưng nhỏ hơn. Đồng thời, lớp pooling vẫn giữ lại phần lớn các thông tin (hoặc đặc trưng) quan trọng trong mỗi bước của giai đoạn pooling.\\
-Tương tự như phép tích chập, cả bước trượt (stride) và kernel đều được gán kích thước trước khi thực hiện phép pooling. Có nhiều phương pháp pooling khác nhau được sử dụng trong các lớp pooling như Max Pooling, Average Pooling,... Nhưng phổ biến và thường được sử dụng nhất là Max Pooling, Min Pooling, và GAP Pooling. Hình 9 minh họa ba phép pooling này.
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/pooling_example.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Ví dụ về lớp pooling}
-\end{figure}
-Hạn chế của Lớp Pooling: Đôi khi, hiệu suất tổng thể của CNN có thể bị giảm do việc sử dụng lớp pooling. Đây là hạn chế chính của lớp này, vì nó giúp CNN xác định liệu một đặc trưng nhất định có xuất hiện trong hình ảnh đầu vào hay không, nhưng chỉ tập trung vào xác định vị trí chính xác của đặc trưng đó. Do đó, mô hình CNN có thể bỏ qua các thông tin liên quan khác.
-\paragraph{Hàm kích hoạt - Activation Function}
-Hàm kích hoạt trong các mạng nơ-ron có vai trò cốt lõi là ánh xạ giá trị đầu vào sang đầu ra. Giá trị đầu vào được xác định bằng cách tính tổng có trọng số của đầu vào neuron kèm với tham số bù (bias, nếu có). Điều này có nghĩa là hàm kích hoạt quyết định liệu một neuron có được kích hoạt hay không dựa trên giá trị đầu vào để tạo ra đầu ra tương ứng.\\
-Các loại hàm kích hoạt phổ biến trong CNN và các mạng nơ-ron sâu khác:\\
-\begin{figure}[h!]
-    \begin{minipage}{0.4\textwidth}
-        \textbf{Sigmoid}: Đầu vào của hàm kích hoạt này là các số thực, trong khi đầu ra được giới hạn trong khoảng từ 0 đến 1. Đường cong của hàm sigmoid có hình dạng chữ S và có thể được biểu diễn toán học trong phương trình sau:
-        \begin{equation}
-        f(x)_{sigmoid}=\frac{1}{1+e^{-x}}
-        \end{equation}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.5\textwidth}
-        \centering
-        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/sigmoid.png} 
-        \caption{Hàm Sigmoid}
-    \end{minipage}
-\end{figure}
+Đây là tích chập nhiều kênh: mỗi đầu ra tích lũy trên toàn bộ kênh đầu vào và vị trí kernel. Trường hợp một kênh có $C_{\rm in}=1$. Theo quy ước CNN, kernel không bị lật chỉ số; phép tính về hình thức là tương quan chéo, thường vẫn gọi là tích chập.
 
-\begin{figure}[h!]
-    \begin{minipage}{0.4\textwidth}
-        \textbf{TanH}: Hàm này tương tự như hàm sigmoid, vì đầu vào của nó cũng là các số thực, nhưng đầu ra được giới hạn trong khoảng từ -1 đến 1. Biểu diễn toán học của nó được thể hiện trong phương trình sau:
-    \begin{equation}
-        f(x)_{tanh}=\frac{e^{x}-e^{-x}}{e^{x}+e^{-x}}
-    \end{equation}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.5\textwidth}
-        \centering
-        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/tanh.png} 
-        \caption{Hàm TanH}
-    \end{minipage}
-\end{figure}
+Stride là khoảng dịch cửa sổ giữa hai vị trí đầu ra liên tiếp. Padding bổ sung giá trị ngoài biên, thường bằng không trong miền thực, và có thể không đối xứng. Với padding dưới/phải $p_b,p_r$, không dùng dilation, kích thước đầu ra là
+\begin{equation}
+\begin{split}
+ H_{\rm out}&=\left\lfloor\frac{H+p_t+p_b-K_h}{s_h}\right\rfloor+1,\\
+ W_{\rm out}&=\left\lfloor\frac{W+p_l+p_r-K_w}{s_w}\right\rfloor+1.
+\end{split}
+\end{equation}
+Stride lớn hơn một thường giảm độ phân giải. Padding cùng stride quyết định cách xử lý cửa sổ biên và vị trí lấy mẫu.
 
-\begin{figure}[h!]
-    \begin{minipage}{0.4\textwidth}
-        \textbf{ReLU}: Là hàm kích hoạt được sử dụng phổ biến nhất trong CNN. ReLU chuyển tất cả các giá trị đầu vào thành các số dương. Lợi ích chính của ReLU so với các hàm kích hoạt khác là giảm tải tính toán. Biểu diễn toán học của ReLU được thể hiện trong phương trình sau:
-    \begin{equation}
-        f(x)_{ReLU}=max(0,x)
-    \end{equation}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.5\textwidth}
-        \centering
-        \includegraphics[width=0.7\textwidth]{Images/Theory/AI/relu.png} 
-        \caption{Hàm ReLU}
-    \end{minipage}
-\end{figure}
+Một MAC (multiply--accumulate) nhân hai toán hạng rồi cộng vào tổng. Lớp trên cần khoảng $H_{\rm out}W_{\rm out}C_{\rm out}K_hK_wC_{\rm in}$ MAC, chưa tính bias và hậu xử lý. Đây là khối lượng số học, không bao gồm tải dữ liệu hoặc điều khiển.
 
-\paragraph{Fully-connected Layer}
-Thông thường, lớp này nằm ở cuối mỗi kiến trúc CNN. Trong lớp này, mỗi neuron được kết nối với tất cả các neuron của lớp trước đó, gọi là phương pháp Kết nối đầy đủ (Fully Connected - FC). Nó được sử dụng như một bộ phân loại trong CNN. Lớp này theo phương pháp cơ bản của mạng thần kinh đa lớp truyền thống (MLP), vì nó là một loại mạng ANN truyền thẳng. Đầu vào của lớp FC đến từ lớp pooling hoặc lớp tích chập cuối cùng. Đầu vào này có dạng một vector, được tạo ra từ các bản đồ đặc trưng sau khi làm phẳng. Đầu ra của lớp FC đại diện cho đầu ra cuối cùng của CNN.
-\begin{figure}[!h]
-    \centering
-    \includegraphics[width=0.8\textwidth]{Images/Theory/AI/fc_example.png}
-    \vspace{10pt} % Thay đổi giá trị 10pt theo nhu cầu
-    \caption{Lớp fully-connected}
-\end{figure}
+\subsection{Kích hoạt và clamp}
+Hàm kích hoạt tạo tính phi tuyến. ReLU là $\max(0,x)$; ReLU6 là $\min(6,\max(0,x))$. Khi lượng tử hóa, các cận thực phải ánh xạ sang miền nguyên tương ứng. Clamp giới hạn giá trị vào $[q_{\min},q_{\max}]$. Clamp theo toàn miền INT8 chỉ giới hạn khả năng biểu diễn, không tự tương đương ReLU hoặc ReLU6. Cần phân biệt cận kiểu dữ liệu với cận kích hoạt của mô hình.
+
+\section{Tích chập depthwise, pointwise và tách theo chiều sâu}
+\subsection{Depthwise: xử lý không gian theo từng kênh}
+Với depth multiplier bằng một, depthwise convolution (DW) dùng một bộ lọc không gian riêng cho mỗi kênh đầu vào và giữ nguyên số kênh:
+\begin{equation}
+ D_{c,y,x}=b^{\rm DW}_c+\sum_{u=0}^{K_h-1}\sum_{v=0}^{K_w-1}
+ W^{\rm DW}_{c,u,v}X_{c,s_hy+u-p_t,s_wx+v-p_l}.
+\end{equation}
+Các kênh được xử lý độc lập, không trộn thông tin. Stride và padding tác động lên cửa sổ như tích chập chuẩn; stride~2 có thể giảm kích thước không gian mà giữ số kênh trong trường hợp này.
+
+\subsection{Pointwise: tích vô hướng theo chiều kênh}
+Pointwise convolution (PW) là tích chập $1\times1$. Với stride~1 và không padding, tại mỗi vị trí, vector $C_{\rm in}$ phần tử được nhân với vector trọng số của từng kênh đầu ra:
+\begin{equation}
+ P_{o,y,x}=b^{\rm PW}_o+\sum_{c=0}^{C_{\rm in}-1}W^{\rm PW}_{o,c}D_{c,y,x}.
+\end{equation}
+Tích vô hướng này tạo $C_{\rm out}$ kênh, giữ kích thước không gian. Cùng trọng số được dùng lại ở mọi vị trí, tạo cơ hội giữ trọng số cục bộ.
+
+\subsection{Chi phí của cặp DW--PW}
+Depthwise-separable convolution thực hiện DW rồi PW: lọc không gian trước, trộn kênh sau. Đây là thành phần nền tảng của MobileNets~\cite{howard2017mobilenets}. Với kernel $K\times K$, depth multiplier bằng một và cùng miền đầu ra, số MAC mỗi vị trí là $K^2C_{\rm in}+C_{\rm in}C_{\rm out}$, so với $K^2C_{\rm in}C_{\rm out}$ của tích chập chuẩn. Tỷ số là
+\begin{equation}
+ \frac{\mathrm{MAC}_{\rm DW+PW}}{\mathrm{MAC}_{\rm dense}}=\frac{1}{C_{\rm out}}+\frac{1}{K^2}.
+\end{equation}
+So sánh bỏ qua bias, kích hoạt và truyền dữ liệu. Cách tách thay đổi cấu trúc tham số, không bảo đảm thay thế mọi kernel chuẩn mà giữ nguyên hàm. TinyMobileNet trong luận văn dùng các cặp DW--PW tùy biến, không phải MobileNetV2.
+
+\section{GAP, lớp kết nối đầy đủ và quyết định phân loại}
+Pooling thu gọn miền không gian. MaxPool chọn phần tử lớn nhất trong cửa sổ cục bộ và chỉ được nêu làm ngữ cảnh chung. Mạng của luận văn dùng Global Average Pooling (GAP), lấy trung bình toàn bản đồ từng kênh:
+\begin{equation}
+ g_c=\frac{1}{HW}\sum_{y=0}^{H-1}\sum_{x=0}^{W-1}X_{c,y,x}.
+\end{equation}
+GAP chuyển tensor $C\times H\times W$ thành vector $C$ phần tử. Trong miền nguyên, phép chia và ánh xạ sang kiểu đầu ra cần quy tắc làm tròn và tái lượng tử hóa.
+
+Lớp kết nối đầy đủ (fully connected, FC) ánh xạ vector đặc trưng sang điểm số của $J$ lớp:
+\begin{equation}
+ s_j=b_j+\sum_{c=0}^{C-1}W^{\rm FC}_{j,c}g_c,
+ \qquad \widehat{j}=\operatorname*{arg\,max}_{0\leq j<J}s_j.
+\end{equation}
+Chuỗi GAP $\rightarrow$ FC $\rightarrow$ điểm số $\rightarrow$ argmax tạo quyết định phân loại. Softmax có thể chuyển logits thực thành phân bố chuẩn hóa, nhưng đường suy luận của luận văn chọn argmax trực tiếp. Điểm số nguyên trước Softmax không phải xác suất. Các điểm số so sánh trực tiếp cần có thang đo và cách biểu diễn tương thích.

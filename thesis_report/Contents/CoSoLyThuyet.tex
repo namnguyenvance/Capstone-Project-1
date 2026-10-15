@@ -1,3 +1,48 @@
 \chapter{CƠ SỞ LÝ THUYẾT}
+\label{chap:cosolythuyet}
+Chương này trình bày nền tảng để đọc kiến trúc MyTinyMobileNetSoC ở Chương~\ref{chap:kientruc} và phân tích tối ưu hóa ở Chương~\ref{chap:toiuu}. Trọng tâm là suy luận CNN số nguyên, bộ xử lý điều phối và chi phí cung cấp dữ liệu cho phần cứng.
 \input{Contents/AI/AI}
 \input{Contents/Risc-v/Riscv}
+
+\section{MMIO và phân chia phần cứng--phần mềm}
+\subsection{Truy cập thanh ghi và đồng bộ hoàn tất}
+I/O ánh xạ bộ nhớ (memory-mapped I/O, MMIO) đặt các thanh ghi ngoại vi trong không gian địa chỉ CPU. Lệnh load/store đến vùng này đọc hoặc ghi ngoại vi thay vì RAM. Thanh ghi có thể chứa cấu hình, toán hạng, kết quả và trạng thái; một lần ghi điều khiển có thể khởi động phép tính. CPU chỉ được dùng kết quả khi giao thức xác nhận dữ liệu hợp lệ.
+
+Hoàn tất giao dịch bus và hoàn tất phép tính là hai sự kiện khác nhau. Ngoại vi có thể công bố cờ done/valid để phần mềm kiểm tra, hoặc trì hoãn đáp ứng lần đọc kết quả. Với giao tiếp native của PicoRV32, yêu cầu được giữ hợp lệ đến khi có ready; trong thời gian chờ, CPU chưa hoàn tất truy cập đó~\cite{YosysHQ2024}. Cơ chế này có thể gây stall mà không cần vòng polling. Ý nghĩa và vòng đời cờ trạng thái phải tuân theo giao diện từng ngoại vi.
+
+\subsection{Chi phí offload và vai trò CPU}
+Một lần gọi bộ tăng tốc gồm chuẩn bị chỉ số, nạp toán hạng, phát lệnh, chờ, đọc kết quả và hậu xử lý. Độ trễ toàn chuỗi có thể lớn hơn nhiều độ trễ datapath. Nếu mỗi phép tính nhỏ cần nhiều giao dịch, giảm số phép nhân chưa chắc giảm tương ứng chu kỳ suy luận.
+
+Phân chia HW/SW giữ CPU phụ trách thứ tự lớp, địa chỉ tensor và xử lý đầu ra, còn phần cứng đảm nhận kernel lặp lại. Cách này linh hoạt khi đổi lịch thực thi, nhưng CPU có thể trở thành nút thắt cung cấp dữ liệu. Trong MyTinyMobileNetSoC, toán hạng đi từ RAM qua CPU tới thanh ghi bộ tăng tốc; các bộ tăng tốc không có DMA. Tái sử dụng dữ liệu cục bộ vì thế là cơ sở quan trọng cho tối ưu hóa.
+
+\section{Tăng tốc trên FPGA, tái sử dụng dữ liệu và lập lịch}
+\subsection{Tài nguyên và ràng buộc thời gian}
+LUT (look-up table) hiện thực hàm logic tổ hợp; register, thường là flip-flop, giữ trạng thái qua cạnh clock. BRAM là khối bộ nhớ chuyên dụng. DSP là khối số học chuyên dụng hỗ trợ các phép như nhân và nhân--cộng. Mảng hoặc phép nhân trong RTL không tự bảo đảm được ánh xạ vào BRAM hoặc DSP; kết luận phải dựa trên báo cáo tổng hợp và hiện thực.
+
+Chu kỳ clock $T_{\rm clk}$ là khoảng cách giữa hai cạnh hoạt động liên tiếp. Ràng buộc timing xác định thời gian cho các đường truyền, kể cả quan hệ clock và I/O. Kiểm tra setup yêu cầu dữ liệu tới thanh ghi đích đủ sớm trước cạnh lấy mẫu; slack là thời gian yêu cầu trừ thời gian đến. WNS (worst negative slack) trong báo cáo setup biểu thị slack xấu nhất theo quy ước báo cáo của công cụ: giá trị âm cho biết vi phạm; giá trị không âm cho biết các đường được phân tích đạt kiểm tra đó. Hold là kiểm tra riêng về việc giữ dữ liệu ổn định sau cạnh lấy mẫu.
+
+Post-route tính cả ảnh hưởng định tuyến, khác với mô phỏng chức năng. Kết luận timing chỉ có giá trị trong phạm vi clock, đường truyền và điều kiện đã ràng buộc, phân tích. Một điểm đạt timing không xác nhận mọi đường đều được ràng buộc đầy đủ hoặc thiết kế đã hoạt động trên bo mạch.
+
+\subsection{Giảm điều khiển và lưu lượng dữ liệu}
+Loop unrolling mở rộng thân vòng lặp để giảm cập nhật biến đếm và nhánh; trong phần cứng, nó còn có thể tạo phép tính song song với chi phí tài nguyên cao hơn. Data packing ghép nhiều phần tử nhỏ vào một word để tăng dữ liệu hữu ích trên mỗi lần tải hoặc giao dịch. Giải gói phải giữ đúng thứ tự phần tử và mở rộng dấu.
+
+Batching gom nhiều kết quả vào một lần gọi để chia sẻ việc nạp dữ liệu, trigger và chờ. Tiling chia miền tính toán thành vùng nhỏ phù hợp nơi lưu cục bộ. Các cửa sổ tích chập lân cận dùng chung phần tử đầu vào; nhiều kênh đầu ra có thể dùng chung một patch. Đổi thứ tự vòng lặp giúp giữ dữ liệu lâu hơn thay vì nạp lại.
+
+Lưu trọng số cục bộ hoặc cache cho phép dùng cùng trọng số qua nhiều vị trí không gian. Cache chuyên biệt có thể được firmware nạp chủ động, không nhất thiết có cơ chế thay thế tự động như cache CPU. Lợi ích phụ thuộc dung lượng, miền tái sử dụng và chi phí chọn dữ liệu. Tăng lưu trữ hoặc song song hóa có thể tăng mux, độ dài đường tổ hợp và áp lực timing.
+
+Mục tiêu chung là giảm truy cập RAM/MMIO và điều khiển trên mỗi kết quả hữu ích. Khi một thành phần được tăng tốc, tỷ trọng các thành phần còn lại tăng lên: đó là sự dịch chuyển nút thắt (bottleneck migration). Cần đo lại sau mỗi thay đổi; số MAC, số giao dịch và số chu kỳ là những đại lượng khác nhau.
+
+\section{Thuật ngữ hiệu năng và kiểm chứng}
+\subsection{Chu kỳ, độ trễ và đối chứng}
+Cycle count là số chu kỳ giữa hai mốc đo xác định. Latency là thời gian từ đầu vào hoặc yêu cầu tới đầu ra tương ứng. Với cùng miền clock và chu kỳ đã biết, thời gian khoảng đo là $t=N_{\rm cycle}T_{\rm clk}$. Cần nêu phép đo có bao gồm UART, truyền dữ liệu, chuẩn bị đầu vào hay khởi tạo hay không. Chu kỳ mô phỏng kết hợp với ràng buộc clock chưa phải độ trễ đo trên bo mạch.
+
+Speedup được định nghĩa bởi $S=t_{\rm baseline}/t_{\rm candidate}$. Có thể dùng tỷ số chu kỳ khi hai phiên bản có cùng chu kỳ clock. Baseline phải xác định phiên bản phần mềm, phần cứng, dữ liệu và phạm vi đo. So với CPU-only và so với hệ thống đã tăng tốc là hai phép so sánh khác nhau. Khi clock thay đổi, giảm chu kỳ chưa chắc giảm thời gian thực.
+
+Một kết quả post-route timing-clean chỉ xác nhận đạt các kiểm tra trong flow và ràng buộc đã dùng. Điểm đạt có tần số cao nhất trong các lần thử chưa phải tần số tối đa thực sự (Fmax); kết luận Fmax cần khảo sát và điều kiện đánh giá tương ứng.
+
+\subsection{Độ chính xác và mức độ tương đương}
+Classification accuracy là tỷ lệ dự đoán đúng nhãn chuẩn trên tập đánh giá. Prediction agreement là tỷ lệ hai cách thực thi cho cùng nhãn dự đoán trên cùng đầu vào, dù nhãn đó có thể sai. Hai vector điểm số khác nhau vẫn có thể cùng argmax; đồng thuận dự đoán không xác nhận số học giống từng bit.
+
+Tested equivalence chỉ biểu thị tương đương trên các ca đã thử, theo tiêu chí cụ thể như tensor, điểm số hoặc dự đoán. Bit-exact arithmetic equivalence đòi hỏi kết quả số nguyên trùng từng bit trong miền đầu vào xét, kể cả trường hợp làm tròn và tràn. RTL equivalence là quan hệ tương đương giữa các mô tả phần cứng theo ánh xạ trạng thái, giao diện và giả thiết môi trường xác định; chứng minh hình thức có phạm vi khác việc chạy một số testbench.
+
+Độ chính xác phân loại, đồng thuận dự đoán và tương đương số học từng bit là ba tiêu chí riêng. Báo cáo kiểm chứng cần nêu đối tượng so sánh, dữ liệu, mức quan sát và giới hạn bằng chứng. Mô phỏng đúng chức năng cũng không thay thế kiểm tra timing hoặc thử nghiệm vật lý.

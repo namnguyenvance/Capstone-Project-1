@@ -1,5 +1,7 @@
-\section{RISC-V}
+\section{Cơ sở RISC-V và PicoRV32}
 \input{Contents/Risc-v/gioithieu}
-\input{Contents/Risc-v/loiich}
-\input{Contents/Risc-v/ungdung}
 \input{Contents/Risc-v/ISA}
+\subsection{Lõi PicoRV32 và vai trò điều phối}
+PicoRV32 là lõi RV32 gọn nhẹ, có thể cấu hình tập lệnh và khối chức năng. Đây là hiện thực nhiều chu kỳ: thời gian thực thi phụ thuộc lệnh, cấu hình và đáp ứng bộ nhớ, không phải CPU đơn chu kỳ~\cite{YosysHQ2024}. Các tùy chọn gồm hỗ trợ nhân/chia, lệnh nén và bộ đếm, cho phép chọn đánh đổi tài nguyên với chức năng.
+
+Giao diện bộ nhớ native gồm địa chỉ, dữ liệu, byte-enable và cặp valid/ready. CPU giữ yêu cầu đến khi bộ nhớ hoặc ngoại vi chấp nhận; thời gian chờ tham gia số chu kỳ chương trình. Trong luận văn, PicoRV32 chạy firmware điều phối suy luận, truy cập tensor trong RAM, cấp toán hạng cho accelerator và hoàn thiện đầu ra. Tài nguyên hay tần số của lõi độc lập không đại diện toàn SoC tích hợp.

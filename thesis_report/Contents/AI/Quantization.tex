@@ -1,2 +1,27 @@
-\subsection{Lượng tử hóa - Quantization}
-\subsubsection{}
+\section{Lượng tử hóa số nguyên và tái lượng tử hóa}
+\subsection{Biểu diễn affine và tích lũy}
+Lượng tử hóa affine biểu diễn gần đúng giá trị thực $r$ bằng số nguyên $q$, scale dương $s$ và zero-point $z$~\cite{jacob2018quantization}:
+\begin{equation}
+ r\approx s(q-z),\qquad q=\operatorname{clip}\!\left(\operatorname{round}(r/s)+z,q_{\min},q_{\max}\right).
+\end{equation}
+Scale xác định bước lượng tử; zero-point là mã nguyên của số không thực. Padding bằng không thực nói chung phải dùng mã $z$, hoặc số không sau khi đã trừ zero-point, tùy miền biểu diễn toán hạng.
+
+Kích hoạt và trọng số INT8 có dấu nằm trong $[-128,127]$, giảm dung lượng và lưu lượng so với biểu diễn 32 bit. Tích có độ rộng lớn hơn toán hạng; tổng nhiều tích cần miền tích lũy đủ rộng. Bias và accumulator thường dùng INT32, nhưng vẫn cần kiểm tra nguy cơ tràn theo miền toán hạng và số hạng cộng.
+
+Với scale đầu vào $s_x$, scale trọng số $s_{w,o}$ và các zero-point tương ứng, tích lũy lý tưởng cho kênh $o$ là
+\begin{equation}
+ A_o=q_{b,o}+\sum_i(q_{x,i}-z_x)(q_{w,o,i}-z_{w,o}).
+\end{equation}
+Bias nguyên $q_{b,o}$ biểu diễn bias thực theo scale $s_xs_{w,o}$ với zero-point bằng không. Per-tensor dùng chung scale cho một tensor; per-channel dùng scale riêng, thường theo kênh đầu ra tích chập, để thích ứng miền trọng số. Công thức mô tả nguyên tắc chung, không quy định thứ tự xử lý bias trong datapath cụ thể.
+
+\subsection{Requantization, làm tròn và giới hạn giá trị}
+Để tạo đầu ra INT8 có scale $s_y$ và zero-point $z_y$, cần tái lượng tử hóa:
+\begin{equation}
+ q_{y,o}=\operatorname{clip}\!\left(\operatorname{round}(M_oA_o)+z_y,q_{\min},q_{\max}\right),
+ \qquad M_o=\frac{s_xs_{w,o}}{s_y}.
+\end{equation}
+Hệ số $M_o$ có thể xấp xỉ bằng multiplier nguyên kết hợp dịch bit, cho phép suy luận không dùng số học dấu phẩy động. Số bit phân số và số dịch phụ thuộc định dạng fixed-point. Theo quy ước luận văn, shift dương chỉ dịch phải, shift âm yêu cầu dịch trái; vẫn phải biết định dạng multiplier để diễn giải đầy đủ phép nhân.
+
+Dịch phải loại bỏ bit thấp nên cần quy tắc làm tròn. Trường hợp nửa bước lượng tử, đặc biệt với số âm, phụ thuộc cách xử lý dấu và quy tắc chọn giá trị hòa. Nhân trung gian hoặc dịch trái có thể tràn trước clamp; saturation của phép toán trung gian khác clamp đầu ra. Clamp có thể kết hợp cận biểu diễn với cận kích hoạt nếu mô hình yêu cầu.
+
+Các công thức mô tả quan hệ lý tưởng, không xác lập hợp đồng làm tròn hay saturation chung cho thư viện C, runtime và RTL. So sánh từng bit phải xét độ rộng trung gian, thứ tự phép toán, làm tròn và xử lý tràn; khác biệt của hiện thực thuộc Chương~\ref{chap:kientruc}.
