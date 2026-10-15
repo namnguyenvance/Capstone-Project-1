@@ -1,94 +1,79 @@
 \chapter{GIỚI THIỆU ĐỀ TÀI}
-\section{Mô tả đề tài}
-    \textbf{Tên đề tài:} Hiện thực ứng dụng sử dụng bộ tăng tốc CNN dựa trên RISC-V.\\
-    \\
-    Mô tả đề tài: RISC-V là một kiến trúc tập lệnh (ISA) mã nguồn mở được xây dựng dựa trên mô hình kiến trúc máy tính RISC (Reduced Instruction Set Computer), với đặc điểm đơn giản và linh hoạt. Nhờ thiết kế tập lệnh gọn nhẹ và khả năng mở rộng cao, RISC-V cho phép tùy chỉnh tối ưu hóa để đáp ứng các yêu cầu đặc thù của từng ứng dụng. Điều này làm cho RISC-V trở thành một lựa chọn hấp dẫn trong các lĩnh vực như trí tuệ nhân tạo (AI), Internet vạn vật (IoT), và các hệ thống nhúng, nơi hiệu suất và tiêu thụ năng lượng là yếu tố quan trọng hàng đầu.\\
-    \\
-    Mạng nơ-ron tích chập (Convolutional Neural Network - CNN) đóng vai trò quan trọng trong nhận dạng hình ảnh và xử lý ngôn ngữ tự nhiên, nhưng khối lượng tính toán ngày càng tăng gây khó khăn cho các kiến trúc CPU truyền thống. Đề tài này tập trung vào việc thiết kế và triển khai một bộ tăng tốc CNN (Convolutional Neural Network) trên nền tảng vi xử lý RISC-V nhằm giải quyết các thách thức tính toán cho các thiết bị biên trong hệ thống IoT. Bộ tăng tốc được xây dựng để hỗ trợ thực hiện các tác vụ AI/học máy với hiệu suất cao và mức tiêu thụ năng lượng thấp, giảm tải cho các máy chủ trung tâm.
-    \\\\
-    Nhiệm vụ (yêu cầu về nội dung và số liệu ban đầu):
-    \begin{enumerate}
-        \item \textit{Nghiên cứu kiến trúc RISC-V:} Tìm hiểu cấu trúc, hoạt động và các bộ vi xử lý dựa trên RISC-V, đặc biệt là khả năng triển khai trên FPGA.
-        \item \textit{Khám phá công cụ mô phỏng:} Sử dụng các phần mềm như Vivado và công cụ mô phỏng RISC-V để thiết kế và kiểm thử
-        \item \textit{Phân tích các nghiên cứu liên quan:} Đánh giá các công trình nghiên cứu về AI/học máy sử dụng RISC-V, đặc biệt là trong môi trường IoT.
-        \item \textit{Triển khai bộ tăng tốc CNN:} Thiết kế và tích hợp các khối chức năng như tích chập, ReLU, và Max-Pooling trên lõi RISC-V, tối ưu hóa cho thiết bị biên IoT.
-        \item \textit{Thử nghiệm ứng dụng IoT:} Kiểm tra hiệu năng của bộ tăng tốc CNN qua một số ứng dụng IoT thực tế, đánh giá độ chính xác và khả năng giảm tải tính toán.
-    \end{enumerate}
+\label{chap:gioithieu}
 
-\section{Giới thiệu vấn đề}
-\subsection{Bối cảnh và xu hướng phát triển}
+\section{Động cơ thực hiện đề tài}
+Suy luận mạng nơ-ron tại thiết bị biên cho phép xử lý dữ liệu gần nơi phát sinh. Tuy nhiên, các hệ thống nhúng thường bị giới hạn về năng lực tính toán và dung lượng bộ nhớ. Với mạng nơ-ron tích chập (Convolutional Neural Network, CNN), số lượng phép nhân--cộng và các lần truy cập tensor có thể làm thời gian suy luận trên một CPU nhỏ trở nên lớn. Hiệu quả năng lượng là một động cơ chung của tính toán tại biên; trong đề tài này, các đại lượng được đánh giá là tính đúng đắn, số chu kỳ, tài nguyên FPGA và timing.
 
-Sự phát triển mạnh mẽ của Internet of Things (IoT) đã đóng góp đáng kể vào sự phát triển của hệ thống Edge Computing và Edge-AI. Các thiết bị IoT ngày càng trở nên phổ biến và yêu cầu khả năng xử lý dữ liệu ngay tại biên mạng, thay vì phải gửi toàn bộ dữ liệu về trung tâm. Điều này dẫn đến sự gia tăng nhu cầu đối với các hệ thống tính toán hiệu quả về năng lượng, đặc biệt là trong các ứng dụng trí tuệ nhân tạo (AI) yêu cầu khả năng xử lý mạnh mẽ nhưng vẫn tiết kiệm tài nguyên.
+Phần cứng chuyên dụng có thể giảm chi phí thực hiện một số phép toán CNN, nhưng cần thêm tài nguyên lưu trữ, datapath và logic điều khiển. Khi CPU phải cấp toán hạng và thu kết quả qua các thanh ghi ánh xạ bộ nhớ, chi phí truyền dữ liệu có thể hạn chế lợi ích của datapath. Vì vậy, lựa chọn phần việc đưa xuống phần cứng phải gắn với cách firmware tổ chức dữ liệu và gọi bộ tăng tốc.
 
+Từ vấn đề đó, đề tài hiện thực MyTinyMobileNetSoC, một hệ thống dựa trên PicoRV32 để suy luận TinyMobileNet trên dữ liệu MNIST. Workload có các lớp tích chập chuẩn, depthwise và pointwise, cho phép khảo sát những yêu cầu khác nhau về tính toán và tái sử dụng dữ liệu trong cùng một đường suy luận. Trọng tâm là xây dựng hệ thống hoạt động tích hợp, xác định nút thắt bằng số đo và cải thiện hiệu năng qua đồng thiết kế phần cứng--phần mềm (HW/SW co-design).
+
+\section{Bài toán đặt ra}
+Tăng tốc CNN không chỉ là tăng tốc số học. Trong MyTinyMobileNetSoC, CPU đọc tensor từ RAM, ghi toán hạng qua MMIO, điều khiển thực thi và đọc kết quả về. CPU còn điều phối thứ tự lớp, cộng bias, xử lý offset và giới hạn giá trị đầu ra. Các bộ tăng tốc không tự truy cập RAM và không có giao diện DMA.
+
+Do đó, hiệu năng phụ thuộc đồng thời vào điều khiển CPU, số giao dịch MMIO, khả năng tái sử dụng dữ liệu, lịch vòng lặp, tái lượng tử hóa và chi phí mỗi lần gọi bộ tăng tốc. Một khối tính toán nhanh vẫn có thể dành phần lớn thời gian chờ CPU cấp dữ liệu. Ngược lại, giữ lại đầu vào hoặc trọng số qua nhiều phép tính có thể giảm chu kỳ mà không cần nhân rộng datapath.
+
+Bài toán của luận văn là phân chia và phối hợp công việc giữa PicoRV32 với các bộ tăng tốc để giảm số chu kỳ suy luận, đồng thời kiểm tra kết quả và đánh giá chi phí hiện thực FPGA. Việc tối ưu được thực hiện trên cả firmware lẫn phần cứng, với đường xử lý trên CPU được duy trì cho các trường hợp chưa được tăng tốc.
+
+\section{Mục tiêu của đề tài}
+Các mục tiêu được xác định theo những kết quả có thể kiểm tra:
+\begin{enumerate}
+    \item Tích hợp suy luận TinyMobileNet trên PicoRV32, từ dữ liệu ảnh MNIST và tham số mô hình đến điểm số của 10 lớp và nhãn dự đoán.
+    \item Hiện thực và tích hợp hỗ trợ phần cứng chuyên dụng cho tích chập chuẩn (Conv), tích chập theo chiều sâu (Depthwise), tích chập theo điểm (Pointwise) và tái lượng tử hóa (Quant).
+    \item Duy trì firmware điều phối cùng đường xử lý thay thế trên CPU (fallback), bảo đảm các lớp hoặc cấu hình ngoài phạm vi bộ tăng tốc vẫn có đường thực thi.
+    \item Giảm số chu kỳ của đường suy luận tích hợp bằng tối ưu truyền dữ liệu, lịch vòng lặp và tái sử dụng toán hạng; ghi nhận kết quả qua sáu mức tối ưu.
+    \item Đánh giá tính đúng đắn trong phạm vi các phép thử đã thực hiện; so sánh điểm số, nhãn dự đoán và số chu kỳ giữa các phiên bản, đồng thời phân biệt baseline tăng tốc với đối chứng CPU-only.
+    \item Đánh giá tài nguyên sử dụng và timing sau định tuyến (post-route) của thiết kế cuối trên FPGA mục tiêu ZCU106.
+\end{enumerate}
+
+\section{Phạm vi thực hiện}
+\subsection{Workload và biểu diễn số}
+Đối tượng suy luận là TinyMobileNet tùy biến, lấy cảm hứng từ cách tổ chức depthwise--pointwise của MobileNet; đây không phải MobileNetV2. Mạng phân loại ảnh MNIST thang xám kích thước $28\times28$ thành 10 lớp. Chuỗi lớp gồm Conv0, ba cặp depthwise--pointwise, trung bình toàn cục (GAP) và lớp kết nối đầy đủ (FC). Firmware chọn nhãn từ điểm số đầu ra bằng argmax.
+
+Kích hoạt và trọng số dùng số nguyên có dấu INT8; bias và giá trị tích lũy dùng INT32. Tái lượng tử hóa sử dụng số học điểm cố định để đưa kết quả về miền đầu ra. Phạm vi kiểm chứng phải xét ngữ nghĩa làm tròn, offset và giới hạn giá trị của đường hiện thực; không mặc nhiên giả định tương đương từng bit với TFLite.
+
+\subsection{Nền tảng phần cứng và phần mềm}
+Hệ thống dùng lõi PicoRV32, firmware bare-metal và RAM dùng chung cho mã lệnh, dữ liệu với dung lượng 256~KiB. CPU trao đổi với các bộ tăng tốc qua MMIO và trực tiếp quản lý di chuyển dữ liệu. SoC còn có UART, thanh ghi LED và bộ nhân độc lập; bộ nhân độc lập không được đường suy luận TinyMobileNet sử dụng.
+
+Phần cứng hỗ trợ tích lũy cho Conv0, các nhánh Depthwise được hỗ trợ và các lớp Pointwise. Ở phiên bản cuối, DW2 tái sử dụng bộ tăng tốc Depthwise, còn DW3, GAP và FC vẫn tích lũy trên CPU; các lớp này sử dụng phần cứng tái lượng tử hóa. Cách phân công cụ thể được trình bày trong Chương~\ref{chap:kientruc}.
+
+\subsection{Đánh giá FPGA và giới hạn triển khai}
+Nền tảng đánh giá FPGA là ZCU106, với linh kiện mục tiêu XCZU7EV. Công việc tổng hợp, bố trí, định tuyến và đánh giá tài nguyên/timing của thiết kế cuối đã hoàn thành trong flow đánh giá hiện có. Điểm ràng buộc chu kỳ $8{,}875$~ns là điểm đạt timing có tần số cao nhất trong các điểm đã thử và có kết luận; kết quả này không xác định Fmax thực sự.
+
+Flow đánh giá SoC chưa khởi tạo RAM bằng firmware và chưa tạo bitstream suy luận TinyMobileNet. Vì vậy, suy luận TinyMobileNet trên bo mạch vật lý vẫn chưa được xác nhận. Phạm vi kết quả không bao gồm đo năng lượng, hiện thực ASIC hoặc chứng minh vận hành thời gian thực trong ứng dụng IoT thực tế.
+
+\section{Phương pháp thực hiện}
+Đề tài bắt đầu từ đường suy luận tích hợp đã sử dụng các bộ tăng tốc, làm baseline cho quá trình tối ưu. CPU giữ vai trò điều phối; mỗi thay đổi được xem xét theo khả năng giảm điều khiển, giảm truyền dữ liệu hoặc tăng tái sử dụng, cùng với yêu cầu kiểm tra kết quả. Sáu mức tối ưu lần lượt là:
+\begin{enumerate}
+    \item \textbf{Level 1:} tối ưu vòng lặp tải trọng số Pointwise trong firmware để giảm chi phí tính địa chỉ và điều khiển vòng lặp.
+    \item \textbf{Level 2:} đóng gói bốn trọng số INT8 trong một lần ghi MMIO 32 bit của Pointwise.
+    \item \textbf{Level 3:} gom điều khiển Pointwise theo nhóm bốn kênh đầu ra tại một vị trí không gian, dùng chung datapath và cơ chế chờ kết quả trên bus.
+    \item \textbf{Level 4:} tái sử dụng phần cứng Depthwise cho DW2 bằng cách chọn các kết quả phù hợp với stride~2.
+    \item \textbf{Level 5:} bổ sung cache trọng số cục bộ cho PW1 để giữ trọng số qua các vị trí không gian trong một lần thực thi lớp.
+    \item \textbf{Level 6:} đổi lịch Conv0 sang duyệt tile trước (tile-first), giữ đầu vào của tile để dùng lại qua các kênh đầu ra.
+\end{enumerate}
+Các mức này tạo thành quá trình tối ưu ở cấp hệ thống, thay vì chỉ cải thiện riêng số phép tính mỗi chu kỳ. Kiến trúc và đường suy luận được mô tả trong Chương~\ref{chap:kientruc}; thay đổi, số đo và đánh đổi của từng mức được phân tích trong Chương~\ref{chap:toiuu}.
+
+Việc đánh giá được tách theo cấp bằng chứng. Độ chính xác mô hình và native C trên máy chủ được đánh giá trên 10\,000 ảnh MNIST test. Mô phỏng RTL/SoC tích hợp kiểm tra điểm số, nhãn và các trường hợp tensor hoặc giao dịch đã thử; kết quả này không phải độ chính xác RTL trên toàn bộ tập test. Các mốc chu kỳ Level~1--6 là số đo mô phỏng lịch sử được tổng hợp ở Chương~\ref{chap:toiuu}, không phải phép đo trên bo mạch.
+
+Khoảng đo tổng chu kỳ có chứa UART giữa các lớp và chi phí điều phối, nhưng chưa bao gồm argmax và báo cáo kết quả cuối. Báo cáo FPGA post-route được dùng để đánh giá tài nguyên và timing theo ràng buộc của từng run, tách biệt với kiểm chứng suy luận vật lý. Việc thiếu bộ log và danh tính build lịch sử đầy đủ cũng giới hạn khả năng tái lập đồng thời mọi mức tối ưu.
+
+\section{Các đóng góp của đề tài}
+Các đóng góp nằm trong phạm vi hiện thực và đánh giá hệ thống:
 \begin{itemize}
-    \item \textit{Sự phát triển của Edge-AI:} 
-    Với sự gia tăng nhanh chóng của các thiết bị IoT, Edge-AI đã trở thành một xu hướng chủ đạo trong ngành công nghiệp công nghệ. Thay vì phải gửi dữ liệu lớn về các trung tâm dữ liệu, Edge-AI cho phép các thiết bị xử lý và phân tích dữ liệu ngay tại biên mạng, giúp giảm độ trễ và tiết kiệm băng thông. Điều này đặc biệt quan trọng đối với các ứng dụng đòi hỏi phản ứng nhanh như nhận diện khuôn mặt, xe tự lái, và hệ thống an ninh.
-
-    \item \textit{Yêu cầu về hệ thống tính toán hiệu quả năng lượng:} 
-    Do hạn chế về tài nguyên và năng lượng, các hệ thống nhúng và thiết bị IoT cần có khả năng xử lý mạnh mẽ nhưng tiết kiệm năng lượng. Điều này đã thúc đẩy sự phát triển của các phần cứng chuyên dụng, đặc biệt là các bộ vi xử lý và các bộ tăng tốc AI được tối ưu hóa cho các ứng dụng Edge-AI.
-
-    \item \textit{Tiến bộ trong kiến trúc phần cứng chuyên dụng:} 
-    Những tiến bộ gần đây trong thiết kế phần cứng chuyên dụng, chẳng hạn như các bộ xử lý có khả năng tăng tốc mạng nơ-ron nhân tạo (AI accelerators), đã giúp nâng cao đáng kể khả năng tính toán cho các ứng dụng AI đòi hỏi sức mạnh tính toán lớn, như xử lý ngôn ngữ tự nhiên (NLP) và thị giác máy tính (CV). Các giải pháp này cung cấp hiệu suất cao hơn và tiết kiệm năng lượng hơn so với các bộ xử lý truyền thống.
-
-    \item \textit{Sự nổi bật của RISC-V trong Edge Computing:}
-    RISC-V, với đặc tính là một kiến trúc mở và có khả năng tùy chỉnh cao, ngày càng được ứng dụng rộng rãi trong các hệ thống nhúng và thiết bị IoT. Kiến trúc này cho phép phát triển các bộ vi xử lý tối ưu hóa cho các tác vụ tính toán phức tạp của AI, đồng thời duy trì được tính linh hoạt và khả năng tiết kiệm chi phí và năng lượng.
-
-    \item \textit{Sự chuyển dịch sang tính toán tại biên (Edge Computing):} 
-    Edge computing đang trở thành xu hướng quan trọng trong ngành công nghiệp, đặc biệt là trong các ứng dụng yêu cầu xử lý dữ liệu gần nơi phát sinh, giảm độ trễ và tối ưu băng thông. Điều này thúc đẩy nhu cầu đối với các hệ thống tính toán có khả năng xử lý phức tạp nhưng với chi phí và năng lượng thấp, tạo cơ hội phát triển cho các bộ tăng tốc CNN trong các môi trường nhúng.
+    \item \textbf{Tích hợp hệ thống:} xây dựng đường suy luận TinyMobileNet INT8 trên PicoRV32 với các bộ tăng tốc Conv, Quant, Depthwise và Pointwise giao tiếp qua MMIO do CPU điều khiển.
+    \item \textbf{Đồng thiết kế phần cứng--phần mềm:} xác định phân công toán tử, duy trì fallback trên CPU và tổ chức tường minh các bước tái lượng tử hóa, hậu xử lý cùng di chuyển dữ liệu.
+    \item \textbf{Tối ưu có số đo:} thực hiện sáu mức tối ưu, giảm baseline đã tăng tốc từ 62\,071\,887 xuống 26\,523\,121 chu kỳ, tương ứng giảm 57,27\% và tăng tốc khoảng $2{,}34\times$ trong khoảng đo đã nêu.
+    \item \textbf{Đối chiếu baseline:} so sánh Level~6 với đối chứng CPU-only dùng các kernel C tổng quát trên RV32, có 259\,218\,212 chu kỳ, cho tỷ số khoảng $9{,}77\times$. Đây là lợi ích kết hợp của lịch phần mềm và offload phần cứng; đối chứng chưa được tối ưu chuyên sâu cho CPU.
+    \item \textbf{Đánh giá FPGA:} tổng hợp kết quả tài nguyên và timing post-route của thiết kế cuối cho ZCU106, đồng thời chỉ rõ giới hạn của flow và phần kiểm chứng trên bo mạch còn chờ thực hiện.
 \end{itemize}
+Các kết quả giữ nguyên điểm số và nhãn trên ảnh đối chiếu lịch sử, cùng các kiểm tra tập trung được ghi nhận, hỗ trợ kết luận trong phạm vi đã thử. Chúng không cấu thành chứng minh tương đương mọi đầu vào giữa các phiên bản hoặc giữa RTL, native C và TFLite.
 
-
-\subsection{Những khó khăn gặp phải}
-
-Mặc dù bộ tăng tốc CNN dựa trên RISC-V mang lại tiềm năng lớn cho các ứng dụng nhúng và hệ thống Edge-AI, nhưng việc triển khai và tối ưu hóa các hệ thống này gặp phải một số khó khăn lớn:
-
+\section{Bố cục luận văn}
+Sau chương giới thiệu, nội dung luận văn được tổ chức như sau:
 \begin{itemize}
-    \item \textit{Hạn chế về tài nguyên phần cứng:} Các hệ thống nhúng trong môi trường Edge-AI thường gặp khó khăn với tài nguyên hạn chế như bộ nhớ, dung lượng bộ xử lý và khả năng tính toán. Việc triển khai bộ tăng tốc CNN yêu cầu tài nguyên tính toán lớn, là thách thức trong các môi trường này.
-    
-    \item \textit{Độ phức tạp trong tối ưu hóa phần cứng:} Việc tối ưu hóa phần cứng RISC-V để thực hiện các phép toán CNN phức tạp, đặc biệt là thiết kế các đơn vị tính toán chuyên dụng (Custom Compute Units), đòi hỏi sự cân nhắc kỹ lưỡng giữa hiệu suất, tài nguyên và khả năng mở rộng hệ thống.
-    
-    \item \textit{Tối ưu hóa phần mềm và phần cứng đồng thời:} Để tận dụng tối đa bộ tăng tốc CNN, cần tối ưu hóa đồng thời phần cứng và phần mềm, đảm bảo mã nguồn khai thác tối đa khả năng phần cứng RISC-V, điều này tạo ra sự phức tạp trong quá trình phát triển.
-    
-    \item \textit{Khả năng tương thích phần mềm:} Việc sử dụng các công cụ phát triển và thư viện AI phổ biến (như TensorFlow, PyTorch) trên bộ vi xử lý RISC-V gặp khó khăn do hệ sinh thái phần mềm còn đang phát triển, gây thiếu hụt tài liệu và công cụ hỗ trợ.
-    
-    \item \textit{Đảm bảo hiệu suất và tiết kiệm năng lượng:} Trong môi trường nhúng với tài nguyên hạn chế, việc tối ưu hóa hiệu suất và tiết kiệm năng lượng trong các thuật toán CNN là một thách thức lớn. Việc xử lý các phép toán phức tạp trong khi tiết kiệm năng lượng là yếu tố quan trọng cần giải quyết.
-    
-    \item \textit{Vấn đề về độ trễ và độ chính xác:} Việc giảm độ trễ và đảm bảo độ chính xác trong các hệ thống CNN phức tạp là một thách thức, đặc biệt là khi triển khai các mô hình AI trong các ứng dụng yêu cầu xử lý thời gian thực trên hệ thống Edge-AI.
+    \item \textbf{Chương 2} trình bày cơ sở về các phép toán CNN, lượng tử hóa, RISC-V/PicoRV32, giao tiếp MMIO, tăng tốc trên FPGA và các thuật ngữ đánh giá hiệu năng.
+    \item \textbf{Chương 3} khảo sát các kiến trúc tăng tốc liên quan và đối chiếu với cách tiếp cận của đề tài.
+    \item \textbf{Chương 4} mô tả kiến trúc MyTinyMobileNetSoC đã hiện thực, các bộ tăng tốc và đường suy luận phối hợp phần cứng--phần mềm.
+    \item \textbf{Chương 5} trình bày quá trình tối ưu, đánh giá tính đúng đắn và hiệu năng theo chu kỳ, cùng kết quả tài nguyên và timing FPGA.
 \end{itemize}
-
-    
-    % Design and Implementation of Convolutional Neural Network Accelerator Based on RISCV(paper)
-\section{Phương pháp giải quyết}
-
-Để tối ưu hóa hiệu suất của các mạng nơ-ron tích chập (CNN) trên kiến trúc RISC-V, có thể áp dụng hai phương pháp chính: tối ưu cấp phần mềm và tối ưu cấp phần cứng. Mỗi phương pháp đều có vai trò quan trọng trong việc giảm độ phức tạp tính toán, tiết kiệm tài nguyên, và tối ưu hóa hiệu suất cho các thiết bị IoT với tài nguyên hạn chế. Hơn nữa, sự kết hợp giữa cả hai phương pháp này có thể mang lại hiệu quả tối ưu cho việc triển khai các mô hình Deep Learning trên các hệ thống nhúng. Dưới đây là mô tả chi tiết của từng phương pháp:
-
-\subsection{Tối ưu cấp phần mềm (Software-Level Optimization)}
-
-Mục tiêu của tối ưu cấp phần mềm là giảm độ phức tạp của các mô hình Deep Learning để chúng có thể hoạt động hiệu quả trên các thiết bị IoT có tài nguyên hạn chế. Các kỹ thuật tối ưu cấp phần mềm bao gồm:
-
-\begin{itemize}
-    \item \textit{Cắt tỉa mô hình (Network Pruning)}: Đây là một phương pháp giúp loại bỏ các kết nối hoặc trọng số không cần thiết trong mạng nơ-ron, từ đó giảm kích thước mô hình mà không làm giảm đáng kể độ chính xác của mạng. Việc cắt tỉa giúp giảm bớt khối lượng tính toán, từ đó tăng tốc độ xử lý và giảm thiểu mức tiêu thụ tài nguyên, đặc biệt là trong các hệ thống nhúng nơi tài nguyên có hạn. Tuy nhiên, việc cắt tỉa cần được thực hiện cẩn thận để không làm giảm đáng kể hiệu quả mô hình.
-    
-    \item \textit{Làm tròn (Quantization)}: Kỹ thuật này chuyển đổi các tham số của mô hình từ kiểu số thực (floating-point) sang kiểu số nguyên (integer). Quá trình này không chỉ giúp giảm kích thước bộ nhớ mà còn tăng tốc độ tính toán và tiết kiệm năng lượng, vì số nguyên có thể được xử lý nhanh hơn và tiêu thụ ít năng lượng hơn. Tuy nhiên, việc làm tròn có thể dẫn đến một số giảm sút về độ chính xác của mô hình. Do đó, cần có một sự cân bằng giữa hiệu suất tính toán và độ chính xác của mô hình. Một phương pháp cải tiến có thể là sử dụng \textit{quantization-aware training}, nơi mô hình được huấn luyện với khả năng làm tròn các giá trị trọng số ngay từ đầu, giúp cải thiện độ chính xác sau khi làm tròn.
-    
-    \item \textit{Tinh chỉnh siêu tham số (Hyperparameter Tuning)}: Ngoài việc tối ưu hóa mô hình qua các kỹ thuật như pruning và quantization, việc tinh chỉnh các siêu tham số như learning rate, batch size, và số lượng lớp trong mạng cũng giúp mô hình hoạt động hiệu quả hơn trên các thiết bị với tài nguyên hạn chế. Việc tìm kiếm và tối ưu các siêu tham số này có thể giúp cải thiện độ chính xác và hiệu suất của mô hình mà không cần thay đổi quá nhiều cấu trúc phần cứng.
-\end{itemize}
-
-\noindent Tuy nhiên, phương pháp tối ưu phần mềm vẫn có một số hạn chế nhất định khi triển khai trên các phần cứng thông thường và chưa đạt được yêu cầu về hiệu suất và tiết kiệm năng lượng cho các thiết bị nhúng.
-
-\subsection{Tối ưu cấp phần cứng (Hardware-Level Optimization)}
-
-Để xử lý các mô hình Deep Learning một cách tiết kiệm năng lượng và hiệu suất cao, cần thiết kế kiến trúc phần cứng đặc thù. Các giải pháp phần cứng bao gồm:
-
-\begin{itemize}
-    \item \textit{Sử dụng FPGA}: FPGA (Field-Programmable Gate Array) là một giải pháp linh hoạt và có thể được tái lập trình, cho phép tối ưu hóa phần cứng cho các tác vụ cụ thể của mô hình Deep Learning. Việc sử dụng FPGA giúp tăng tốc độ tính toán và giảm độ trễ, đặc biệt là đối với các ứng dụng AIoT yêu cầu sự linh hoạt cao và thay đổi nhanh chóng trong việc triển khai các thuật toán.
-    
-    \item \textit{Sử dụng ASIC}: ASIC (Application-Specific Integrated Circuit) là các mạch tích hợp chuyên dụng được thiết kế cho một ứng dụng cụ thể, giúp tối ưu hóa hiệu suất và tiết kiệm năng lượng. Trong khi FPGA mang lại sự linh hoạt, ASIC lại có khả năng cung cấp hiệu suất cực cao và mức tiêu thụ năng lượng thấp hơn, tuy nhiên nó đòi hỏi chi phí phát triển cao và ít linh hoạt hơn khi thay đổi thuật toán.
-\end{itemize}
-
-\subsection{Kết hợp của hai phương pháp trên}
-
-Phương pháp kết hợp tối ưu cấp phần mềm và phần cứng có thể mang lại giải pháp lý tưởng cho việc triển khai các mô hình Deep Learning trên các thiết bị IoT. Bằng cách áp dụng các kỹ thuật tối ưu hóa phần mềm (như pruning và quantization) cùng với việc thiết kế phần cứng đặc thù (như FPGA hoặc ASIC), có thể khai thác được điểm mạnh của cả hai phương pháp.\\
-\\
-Việc kết hợp này không chỉ giúp cải thiện hiệu suất xử lý và giảm độ trễ mà còn tối ưu hóa mức tiêu thụ năng lượng, tạo ra hệ thống AIoT hiệu quả và phù hợp cho các ứng dụng yêu cầu tính toán nhanh và tiết kiệm năng lượng, chẳng hạn như nhận diện hình ảnh và phân loại dữ liệu trong các hệ thống giám sát an ninh hay chăm sóc sức khỏe.
-
