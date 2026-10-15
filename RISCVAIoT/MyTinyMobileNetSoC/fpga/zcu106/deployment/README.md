@@ -50,35 +50,49 @@ The SI570 is programmable: verify its actual setting is 300 MHz before using
 these timing/heartbeat expectations. No PS firmware is required by this design.
 This test does not verify any MyTinyMobileNetSoC functionality.
 
-## Windows build and programming
+## Build and program from WSL
 
-From a Vivado 2024.1 command prompt, substitute your checkout path:
+From this deployment directory in WSL Ubuntu:
 
-```bat
-cd /d C:\path\to\Capstone-Project-1-work\RISCVAIoT\MyTinyMobileNetSoC\fpga\zcu106\deployment
-if not exist build mkdir build
-cd build
-vivado -mode batch -source ..\run_smoke.tcl -log vivado.log -journal vivado.jou
+```sh
+make help
+make check
+make smoke
+make program
+make clean
 ```
 
-All reports, checkpoints, logs and `zcu106_smoke.bit` stay in `deployment/build/`.
-Check exit status and `status.txt`; bitstream generation is not board proof.
-For this WSL checkout, the exact Windows command-prompt build invocation is:
+Vivado still runs on Windows; GNU Make only orchestrates it from WSL.
+Windows interop (`cmd.exe`) and `wslpath` must be available. No manual Vivado
+Tcl Shell or `settings64.bat` step is needed. The default executable is
+`C:\Xilinx\Vivado\2024.1\bin\vivado.bat`. Override it when needed:
 
-```bat
-pushd \\wsl.localhost\Ubuntu\home\nammatthew\projects\Capstone-Project-1-work\RISCVAIoT\MyTinyMobileNetSoC\fpga\zcu106\deployment\build
-C:\Xilinx\Vivado\2024.1\bin\vivado.bat -mode batch -source ..\run_smoke.tcl -log vivado.log -journal vivado.jou
+```sh
+make smoke VIVADO_VERSION=2024.2
+make smoke 'VIVADO_ROOT=C:\Program Files\Xilinx\Vivado\2024.1'
 ```
 
-With the ZCU106 powered and its programming USB/JTAG connection available,
-run from the same build directory:
+`VIVADO_BAT` can also override the full executable path. `make help` prints the
+configured executable and dynamically converted Windows deployment path.
+The wrapper uses `wslpath -w` and `cmd.exe /D /C call` with quoted `pushd` and
+`call` arguments in a generated `build/*_wsl.cmd` launcher (CRLF).
+`pushd` supports the `\\wsl.localhost\Ubuntu\...` UNC path
+by assigning a temporary drive for that command process. Vivado starts inside
+`build/` and runs the existing `run_smoke.tcl` or `program.tcl` in batch mode.
 
-```bat
-vivado -mode batch -source ..\program.tcl -log program.log -journal program.jou
-```
+All reports, checkpoints, logs, journals, `.Xil` data, and
+`zcu106_smoke.bit` stay in the ignored `deployment/build/` directory.
+Build logs are `vivado.log`/`vivado.jou`; programming logs are
+`program.log`/`program.jou`. Check the build exit status and `build/status.txt`;
+bitstream generation is not board proof. `make clean` removes only `build/`.
 
-For the same installed toolchain, replace `vivado` with
-`C:\Xilinx\Vivado\2024.1\bin\vivado.bat`.
+`make program` requires an existing bitstream and a powered ZCU106 with its
+USB/JTAG connection visible to Windows. It never invokes `make smoke`.
+Without hardware, target discovery can fail: this is a programming failure,
+not a build failure, and the existing bitstream is retained. Inspect
+`build/program.log` for the precise Vivado error. The wrapper also checks this
+log for `ERROR:` lines because Vivado can return zero after a Tcl programming
+error.
 
 The programming script requires exactly one XCZU7EV device; disconnect unrelated
 hardware targets if discovery is ambiguous. Programming is explicit and separate
