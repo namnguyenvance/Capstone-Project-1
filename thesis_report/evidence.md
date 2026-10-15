@@ -1,43 +1,31 @@
 # Thesis template audit and evidence register
 
-Paths below are relative to the repository root. Audit and cleanup date: 2026-10-12. Repository paths below are the evidence references; no evidence artifacts are copied into the thesis directory.
-This writing task changed thesis documents only; it did not rerun inference,
-train models, build firmware, run RTL tests or launch Vivado.
+Paths are relative to the repository root. Current audit: 2026-10-15.
+This documentation pass did not rerun inference, train models, build firmware,
+run RTL tests or launch Vivado. Evidence remains at its original source paths.
 
-## Authoritative template
+## Active template and document structure
 
-- `thesis_report/main.tex`: `report`, 11 pt, A4; Vietnamese `vntex`.
-  Existing geometry, title page, fancy headers/footers, caption configuration,
-  line spacing and chapter style preserved. No template redesign.
-- Chapters are included with `\input`, relative to `thesis_report/`, with
-  extension omitted. Three existing chapter roots are
-  `Contents/GioiThieuDeTai`, `Contents/CoSoLyThuyet`, and
-  `Contents/CongTrinhNghienCuuLienQuan`. Their contents and nested files are
-  unchanged. Chapter 4 reuses `Contents/PhuongPhap/PhuongPhap.tex` and its
-  existing `GioiThieu.tex`/`KienTruc.tex` split. Chapter 5 is added as
-  `Contents/ToiUu/ToiUu.tex` before the bibliography.
-- Filenames use Vietnamese descriptive names, usually without accents;
-  existing literature survey directories also have accented names/spaces.
-- Images use explicit `Images/...` paths in `\includegraphics`. No
-  `\graphicspath` or diagram generation was introduced. Existing solution
-  images describe an obsolete proposal and are no longer included in Chapter 4.
-  They are retained on disk.
-- Figures use floats, centering and caption; tables use tabular, horizontal
-  rules and the global caption style. New tables follow those conventions.
-  New diagram locations use clearly labelled text-only boxes, not invented
-  architecture illustrations or copied legacy diagrams.
-- `Outro/TaiLieuThamKhao.tex`: `\nocite{*}`, `\bibliographystyle{plain}`,
-  `\bibliography{mybib.bib}`. This is BibTeX, not biblatex/biber.
-  `mybib.bib`, Outro files and the preamble remain unchanged. Existing bibliography
-  entries were inspected, but no new or fabricated entries were added.
-- No engine directive, build script or latexmk configuration was found in the
-  template. Its vntex setup is consistent with pdfLaTeX + BibTeX; that is the
-  proposed build sequence, not an explicitly specified template engine.
+- `thesis_report/main.tex`: `report`, 11 pt, A4, Vietnamese `vntex`;
+  existing geometry, title-page styling, headers/footers, captions, line spacing
+  and chapter style preserved. Navigation uses roman front matter and arabic
+  main text, with cover anchors disabled to avoid duplicate PDF destinations.
+- Chapters use relative `\input` paths. Chapters 1–3 roots are
+  `Contents/GioiThieuDeTai`, `Contents/CoSoLyThuyet` and
+  `Contents/CongTrinhNghienCuuLienQuan`. Chapter 1 ownership wording was updated;
+  Chapters 2–3 are unchanged. Chapter 4 retains its `PhuongPhap` split and
+  Chapter 5 remains `Contents/ToiUu/ToiUu.tex`.
+- Five thesis-local TikZ figures are included directly; no placeholder artwork
+  remains. Existing labels are retained. Legacy solution images stay on disk
+  but are not included in Chapter 4.
+- `Outro/TaiLieuThamKhao.tex` uses BibTeX `plain` with `mybib`, no wildcard
+  nocite, and a linked bibliography TOC entry. The list of tables is enabled.
+- Current pdfLaTeX/BibTeX build and layout findings are recorded at the end.
 
 ## PDF references read
 
-Both PDFs were extracted with pypdf downloaded only into `/tmp/thesis_pdf_tools`.
-Extracted reference text is temporary, outside the repository.
+Both reference PDFs were read via temporary text extracts; this final pass used
+`pdftotext -layout`. Extracted reference text remains outside the repository.
 
 - `Capstone_Project__Demo_.pdf`: 59 PDF pages. Architecture/detail organization
   on PDF pp. 2–32; system on p. 32; waveform and implementation discussion
@@ -136,135 +124,6 @@ by either document and has been removed from the chapter.
 - SoC evaluation reached post-route; A0 bitstream was generated only for an
   independent smoke test. Physical programming, LED observation and TinyMobileNet
   board inference remain pending, as stated in the original deployment sources.
-
-## Build and validation
-
-Expected command sequence, from `thesis_report/`:
-
-```sh
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-bibtex main
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
-```
-
-No pdflatex, xelatex, lualatex, latexmk or bibtex executable is installed in this
-session. Compilation could not run. No LaTeX packages or system tools were
-installed. A static check covers recursive includes, image-file existence,
-new chapter brace/environment balance, duplicate labels and new references.
-This does not establish page layout, float placement, font availability, absence
-of overfull boxes or successful bibliography rendering.
-
-## Outstanding review
-
-- Five diagram locations: network, SoC, PW datapath, inference firmware flow,
-  and Conv0 before/after scheduling. Each is visibly labelled a placeholder.
-- Two `% TODO: literature citation` comments: depthwise-separable convolution
-  theory and affine quantization. No new unresolved `\cite` keys were introduced.
-- Conv0 instruction-count pair lacks original measurement evidence and is excluded from Chapter 5.
-- Historical optimization build/log identities need primary-source archival for reproducibility. No historical reason for stopping is asserted; the user-directed scope freeze is stated instead.
-- Final typeset Vietnamese wording, line breaks, table widths and float positions
-  require review after a real pdfLaTeX/BibTeX build.
-
-### Final cleanup validation (2026-10-12)
-
-Validation results are recorded below after running the static review. Compilation
-remains unavailable because no LaTeX engine is installed; static checks do not
-establish rendered pagination, table widths, float placement or font rendering.
-
-- `git diff --check`: exit 0. Because the thesis directory was already untracked,
-  additionally checked new chapter files for trailing whitespace; none found.
-- Recursive active LaTeX graph: 29 files; token-aware brace/environment checks
-  pass, including unchanged main template. All input/image paths exist, no
-  duplicate labels, no unresolved references or citation keys. `LastPage` is
-  provided by the existing package. Five figure TODOs and two literature TODOs
-  remain in Chapters 4–5.
-- SHA256 comparison against the pre-cleanup snapshot: no tracked technical file
-  or Chapter 1–3 file changed. Cleanup edits are limited to the Chapter 4
-  introduction/architecture, Chapter 5 and this note; seven copied evidence
-  files were deleted. No new file was created during cleanup.
-- Relative to the pre-writing template, the only modified original files are
-  `main.tex` and `Contents/PhuongPhap/{PhuongPhap,GioiThieu,KienTruc}.tex`;
-  the only created files remaining are `Contents/ToiUu/ToiUu.tex` and
-  `evidence.md`. Original formatting and Chapters 1–3 remain unchanged.
-- Chapters 4–5 are ready for human technical/editorial review. They are not
-  submission-ready until diagrams, literature citations and rendered LaTeX
-  validation are completed. Retained numerical results have repository
-  documentation/walkthrough/report sources; historical raw simulation log and
-  build completeness remains a reproducibility limitation.
-- No commit made; no firmware, model, RTL, evaluation code or FPGA flow changed.
-
-
-## Presentation review — 2026-10-15
-
-This section supersedes the earlier engine-unavailable/build-pending status.
-No technical claims were added in this presentation pass. Chapters 1–3,
-technical sources, main preamble, margins, title page, chapter style, headers,
-footers and bibliography style were left unchanged. Two Chapter 1–3 files
-already had user edits at the start of the pass; those were preserved byte-for-byte.
-
-### Build and visual inspection
-
-From `thesis_report/`:
-
-```sh
-latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
-```
-
-Build succeeded with latexmk 4.87 / pdfLaTeX; final PDF is 60 A4 pages.
-Chapters 4–5 occupy PDF pages 45–58 (printed pages 38–51). Reviewed rendered
-pages with pdftoppm, including reinspection of changed page breaks and floats.
-
-Local edits in `Contents/PhuongPhap/KienTruc.tex` and
-`Contents/ToiUu/ToiUu.tex`:
-
-- Override negative figure-caption spacing only inside the five new placeholder
-  floats; add small internal padding so captions no longer overlap their boxes.
-- Increase table row spacing locally to 1.12; numeric columns remain right aligned.
-- Typeset MMIO ranges with a text en dash between monospaced endpoints.
-- Permit line breaks within the Vivado run identifier and recast its introductory
-  sentence without changing the tool, device, run ID or timing values.
-- Shorten the network introduction without changing meaning, avoiding a single
-  continuation line at the top of the following page; standardize Conv and
-  quantization section titles to the established terminology.
-- Move the Conv0 traffic table to a paragraph boundary. Start the Depthwise and
-  final per-layer-analysis sections on a new page to keep their opening material
-  together. Recheck these local breaks when real figures replace placeholders.
-
-Chapter 5 tables have distinct roles and remain as tables: the accelerated
-baseline through Level 6 progression gives historical totals; the Level 6 table
-shows remaining layer costs; the comparison table distinguishes accelerated and
-CPU-only denominators. No redundant chart or new numerical column was added.
-The baseline row retains its existing name, rather than inventing a new version.
-
-### Figure TODO specifications (no figures generated)
-
-| Existing figure | What the figure should show, using only existing chapter claims | Recommended form |
-|---|---|---|
-| 4.1, `fig:network-placeholder` | Input → Conv0 → DW1 → PW1 → DW2 → PW2 → DW3 → PW3 → GAP → FC → prediction; existing tensor shapes/strides and HW/SW allocation | Data-flow diagram; retain the existing tensor table for exact dimensions |
-| 4.2, `fig:soc-placeholder` | PicoRV32, shared RAM, MMIO bus, UART, LED and the five existing compute peripherals; CPU-mediated operand/result transfer, no DMA links | Architecture block diagram |
-| 4.3, `fig:pw-placeholder` | Shared INPUT, weight banks/cache selection, shared dot-product tree, sequential batch control, result publication and rvalid; distinguish cached PW1 from PW2/PW3 | Architecture block diagram |
-| 4.4, `fig:flow-placeholder` | Boot and layer schedule, dispatcher selection, CPU data preparation, MMIO trigger/read, software post-processing, GAP/FC accumulation and prediction/reporting | Data-flow diagram |
-| 5.1, `fig:tile-reuse-placeholder` | Side-by-side Conv0 schedules: repeated patch load by output channel versus one patch load reused across output channels; existing valid-boundary handling | Data-flow diagram, not an optimization progression or cycle comparison chart |
-
-No additional chart is required for the three Chapter 5 summary tables. Figure
-scale and final pagination must be revisited after actual artwork is supplied.
-
-### Final warnings and review status
-
-- `git diff --check`: passed.
-- Entire document: zero overfull boxes, 22 pre-existing underfull hbox notices,
-  eight pre-existing `!h`→`!ht` float notices, six package warnings (vntex input
-  encoding default, obsolete PGF snakes and four geometry over-specification
-  warnings). These occur before Chapter 4; the template was not redesigned.
-- Chapters 4–5: no overfull/underfull box or LaTeX/package warning in their log span.
-- No unresolved references/citations or multiply-defined-label warnings.
-- Five figure TODOs and two literature citation TODO comments remain: the
-  depthwise-separable-convolution discussion and affine quantization discussion.
-  The citation TODOs are editorial placeholders, not undefined citation keys.
-- Ready for visual/technical human review with visibly labelled figure placeholders;
-  not a final submission layout until figures/citations are completed. No other
-  layout issue needs a manual decision at this stage. No commit made.
 
 ## Reviewer-approved corrections — 2026-10-15
 
@@ -380,69 +239,109 @@ still determine interpretation. Physical TinyMobileNet validation remains pendin
   dispatcher and MMIO causal explanations are identified as recorded attribution
   or architectural inference, rather than independent cycle decompositions.
 
-### Validation of the reviewer-approved pass
+## Final whole-thesis corrections and current build — 2026-10-15
 
-- `latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex` from
-  `thesis_report/`: passed; resulting PDF has 63 pages. Rendered and visually
-  checked the new verification/accuracy and FPGA tables and the reflowed cycle
-  analysis. No generated figures or new raw-evidence copies were introduced.
-- `git diff --check`: passed. Chapters 4–5 have no overfull/underfull hbox or
-  LaTeX/package warning in their log span; no unresolved references/citations
-  or duplicate labels. Pre-existing warnings outside these chapters remain.
-- Pre/post file-hash comparison: only `Contents/PhuongPhap/GioiThieu.tex`,
-  `Contents/PhuongPhap/KienTruc.tex`, `Contents/ToiUu/ToiUu.tex` and this register
-  changed during this pass. Chapters 1–3 (including their pre-existing user
-  edits), technical source, template and bibliography were preserved.
-- Reviewer corrections are applied; outstanding work is the five existing figure
-  placeholders, two literature citation TODOs and recovery/archival of original
-  host/matched/historical run evidence. Approved accuracy figures are included
-  with their provenance limitation, not presented as a newly executed experiment.
-- Ready for figure insertion and subsequent technical review. Final pagination
-  must be rechecked after artwork insertion. Physical board validation and true
-  Fmax characterization are outside this editing pass and remain pending.
-- No commit made.
+This is the current layout/build record. Earlier pagination, build-unavailable
+statements and figure-placeholder checklists were removed because they no longer
+represent the active document. Historical result provenance above is retained;
+no missing raw evidence has been reconstructed or fabricated.
 
+### Applied documentation corrections
 
-## Chapters 4–5 finalization — 2026-10-15
+- Added the Vietnamese abstract, with both cycle comparisons and the three host
+  accuracy values; it distinguishes host accuracy from RTL testing, the tested
+  timing point from true Fmax, and post-route evaluation from board validation.
+- Chapter 1 now separates PicoRV32, inherited Conv/Quant and external ML/tools
+  from the student's integration, firmware, DW/PW/MMIO, Level 1–6, evaluation
+  methodology and FPGA preparation work. `cmp` confirmed that active
+  `my_conv_accel.v` and `my_quant_accel.v` are byte-identical to their respective
+  `MyLeNet5SoC` counterparts. This supports reuse, not identification of an
+  original individual author. PicoRV32 is attributed through its existing citation.
+- Added compact model-preparation context from `train_model.py`,
+  `generate_model_data.py` and `extract_mnist_test.py`: float Keras on normalized
+  MNIST, full INT8 TFLite with 200 training images for calibration, C export,
+  input quantization and integer firmware. Training ReLU6/Softmax is explicitly
+  distinguished from full INT8 firmware clamps and integer scores/argmax.
+- Added section 5.12, concluding with measured outcomes, scope, FPGA trade-offs
+  and remaining work, without new experiments or changed technical results.
+- Added body callouts for Figures 4.1–4.4/5.1 and Tables 4.2/5.3–5.7. All active
+  Chapter 4–5 figure/table labels now have explicit body references. Existing
+  labels, including `-placeholder` suffixes, are unchanged; artwork is present.
+- Removed `\nocite{*}`. The rendered bibliography contains exactly the ten cited
+  keys. Protected title capitalization; corrected `he2021design` to `@article`
+  with `journal` and `publisher`, keeping its existing author/year/volume/issue/
+  article number/DOI. The former volume/number warning is gone. The IOP landing
+  page/DOI was inaccessible during this pass; no new publication metadata was
+  inferred from inaccessible content.
+- Kiningham's legacy citation key is retained; year 2017 is supported by the
+  Stanford Spring 2017 project index and linked report. Its source URL and the
+  versioned Chipyard documentation URL are now visible with the plain style.
+  Waterman is a technical report, with the Berkeley report number/institution.
+  Verified primary references:
+  - https://cs231n.stanford.edu/2017/reports.html
+  - https://cs231n.stanford.edu/reports/2017/pdfs/116.pdf
+  - https://chipyard.readthedocs.io/en/1.11.0/Customization/RoCC-Accelerators.html
+  - https://www2.eecs.berkeley.edu/Pubs/TechRpts/2014/EECS-2014-54.html
+- Preserved prior conceptual citations to Howard et al. (2017),
+  https://arxiv.org/abs/1704.04861, and Jacob et al. (CVPR 2018),
+  https://arxiv.org/abs/1712.05877. Neither changes firmware equivalence claims.
+- Disabled cover page anchoring, used roman front matter and arabic main text,
+  enabled the list of tables, and added a linked bibliography TOC entry.
+  Official visual styling, margins, headers and chapter styles remain intact.
+- Acknowledgements only: changed “học viên” to “sinh viên” and “tôi” to “em”.
 
-- Added `howard2017mobilenets` (Howard et al., MobileNets, 2017,
-  https://arxiv.org/abs/1704.04861), verified against section 3.1 of the
-  primary paper. Citation is attached only to the conceptual explanation
-  of depthwise plus pointwise convolution in `KienTruc.tex`.
-- Added `jacob2018quantization` (Jacob et al., CVPR 2018, pp. 2704–2713,
-  https://arxiv.org/abs/1712.05877), verified against section 2.1, equation
-  (1). Citation is attached only to the general affine quantization model.
-  Native C / RTL / TFLite rounding and saturation caveats are unchanged.
-- Removed exactly the two resolved literature-citation TODO comments.
-  No TODO comments remain in the Chapter 4–5 source directories.
-- Corrected the nontechnical introduction sentence that still described
-  the now-integrated figures as placeholders. No technical claims changed.
-- Added thesis-local `.gitignore` rules for generated LaTeX auxiliary files,
-  logs and `/main.pdf`. These outputs were untracked; no tracked outputs
-  were removed. The review PDF remains available locally.
-- Re-audited all five figures against `my_soc.v`, `my_pw_conv_accel.v`,
-  `main_tinymobilenet.c`, `start.s` and `dl_ops.c`. Confirmed DW1 HW,
-  exact DW2 HW reuse, DW3 CPU + Quant, per-invocation PW1 preload over
-  784 positions, PW2/PW3 batch, GAP CPU + Quant, FC CPU + Quant,
-  CPU-mediated RAM/MMIO transfers, no DMA, standalone multiplier unused
-  by inference, and total measurement stopping before argmax/reporting/LED.
-  No figure source changes were necessary. Conv0 traffic was independently
-  checked again from loop bounds: writes 40,000 to 2,500; valid source loads
-  33,856 to 2,116; result reads 14,400 to 12,544; Quant 62,720 unchanged;
-  stores 12,544 unchanged. Loop-panel abstraction remains documented in
-  `Images/tinymobilenet/README.md`.
-- `latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex`, run in
-  `thesis_report/`, passed. `git diff --check` passed. `pdfinfo` reports
-  66 A4 pages. Figure pages remain 40, 42, 45, 47, 54 (printed numbering).
-  All five final figure pages and the new bibliography entries were visually
-  inspected. Citation-bearing prose was checked in the rendered PDF.
-- Final log has no unresolved references/citations, duplicate labels or
-  overfull boxes. Auxiliary-label counting also found no duplicates.
-  Remaining existing warnings: vntex default input encoding, obsolete TikZ
-  snakes library, geometry overspecification, adjusted `!h` floats, earlier
-  underfull paragraphs and duplicate PDF page destinations from restarted
-  page numbering. BibTeX retains its existing volume/number warning for
-  `he2021design`. These are outside the Chapter 4–5 cleanup scope.
-- Technical source files and Chapters 1–3 were unchanged during finalization;
-  hashes were checked. Pre-existing Chapter 1–3 working-tree edits remain
-  separate and must be excluded from the Chapters 4–5 commit. No commit made.
+### P0 manual confirmation: declaration and document identity
+
+The reference `RISC_V_AIoT_Capstone_Project_Print_V1.pdf`, PDF page 2,
+contains another student's declaration with broad originality and legal
+commitments. No current official institutional declaration form was established.
+Those commitments were not attributed to the current author. `LoiCamDoan.tex`
+contains a visible pending-text notice and prepared date/signature structure.
+The author must confirm the applicable wording, including reused components,
+and supply date/signature before submission.
+
+Cover references do not establish this student's official submission identity:
+`Capstone_Project__Demo_.pdf` is another student's October 2025 graduation
+project; the print reference is a different student's project and council.
+Therefore the active cover/footer fields were left unchanged, pending decision:
+
+- Cover: “BÁO CÁO / ĐỒ ÁN MÔN HỌC KỸ THUẬT MÁY TÍNH”.
+- Topic: “Hiện thực bộ tăng tốc CNN dựa trên RISC-V”.
+- Date: “TP. HỒ CHÍ MINH, THÁNG 12/2025”.
+- Running footer: “Đồ án môn học Kỹ thuật Máy tính - CO4041”.
+- “HỘI ĐỒNG:” is empty. Confirm whether this field applies and its exact value.
+
+Confirm the official category/degree wording, topic if required, date and council;
+update cover/footer consistently. The current date was not used as a submission date.
+
+### Final build and visual audit
+
+- Command, from `thesis_report/`:
+  `latexmk -pdf -gg -interaction=nonstopmode -halt-on-error main.tex` — passed.
+- `git diff --check` — passed after documentation and evidence updates.
+- `pdfinfo main.pdf`: **53 A4 pages**. Cover = PDF page 1; roman front matter
+  = i–viii (PDF pages 2–9); numbered main matter = 1–44 (PDF pages 10–53).
+- Abstract: PDF page 4 (iii). Declaration pending page: PDF page 2 (i).
+  TOC: PDF pages 5–7. List of figures: PDF page 8. List of tables: PDF page 9.
+  Bibliography: printed page 44 / PDF page 53, linked in TOC.
+- Current figure locations (printed / one-based PDF): 4.1 = 25/34;
+  4.2 = 26/35; 4.3 = 30/39; 4.4 = 32/41; 5.1 = 39/48.
+- Chapter 5 conclusion: section 5.12, printed pages 42–43 / PDF pages 51–52.
+- Source/auxiliary audit: no duplicate labels; every reference resolves;
+  no unresolved citations; bibliography keys exactly match cited keys.
+  Final log: zero overfull boxes, duplicate PDF destinations or BibTeX warnings.
+- Remaining log notices: vntex default UTF-8 input encoding, obsolete PGF snakes
+  library, four geometry over-specification warnings (horizontal/vertical twice),
+  and five underfull hboxes in existing Chapter 2 material. No float-placement
+  warning remains. Template settings were not redesigned to silence these notices.
+- Rendered with `pdftoppm` and visually inspected: cover, prepared declaration,
+  abstract, all TOC pages, both lists, Chapter 1 opening, all four Chapter 4
+  figures, Figure 5.1, Chapter 5 ending and bibliography. No clipping, caption
+  overlap or unreadable figure/table content was observed at review scale.
+- Only thesis documentation changed. Chapters 2–3 and all technical source,
+  models, datasets, binaries, evaluation scripts and FPGA results are untouched.
+  No firmware/RTL/native builds or new simulations were needed or run.
+- Not submission-ready while declaration and official identity are unresolved.
+  Original host/matched/historical raw evidence archival remains a reproducibility
+  limitation; physical TinyMobileNet board validation remains pending as stated.
+  No commit made.

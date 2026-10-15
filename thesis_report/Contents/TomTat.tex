@@ -1,1 +1,6 @@
-% \chapter*{Tóm tắt nội dung}
+\chapter*{Tóm tắt}
+Luận văn nghiên cứu suy luận CNN trên SoC RISC-V gọn nhẹ với workload TinyMobileNet phân loại ảnh MNIST. Hệ thống MyTinyMobileNetSoC kết hợp lõi PicoRV32 và các bộ tăng tốc chuyên dụng giao tiếp qua MMIO. Theo hướng đồng thiết kế phần cứng--phần mềm, CPU điều phối suy luận và truyền dữ liệu, còn các bộ tăng tốc hỗ trợ tính toán và tái lượng tử hóa.
+
+Qua sáu mức tối ưu, số chu kỳ giảm từ baseline đã tăng tốc 62\,071\,887 xuống 26\,523\,121, tương ứng tăng tốc $2{,}3403\times$ và giảm 57,27\%. So với đối chứng CPU-only RV32 dùng kernel C tổng quát có 259\,218\,212 chu kỳ, phiên bản cuối đạt tỷ số $9{,}7733\times$. Các số đo mô phỏng này bao gồm UART giữa các lớp trong khoảng đo đã xác định.
+
+Trên máy chủ, độ chính xác trên 10\,000 ảnh MNIST test của mô hình float, TFLite INT8 và native C lần lượt là 94,64\%, 94,42\% và 94,33\%; đây không phải độ chính xác RTL trên toàn bộ tập test. Thiết kế được đánh giá tài nguyên và timing FPGA sau định tuyến trên ZCU106. Điểm đạt timing cao nhất đã thử có chu kỳ ràng buộc $8{,}875$~ns, không xác định Fmax thực sự. Kiểm chứng suy luận TinyMobileNet trên bo mạch vật lý vẫn còn chờ thực hiện.

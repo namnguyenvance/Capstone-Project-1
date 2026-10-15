@@ -70,6 +70,8 @@ Tổng chu kỳ giảm xuống 55\,395\,889. PW1 giảm từ 16\,744\,574 xuốn
 \section{Level 2: đóng gói trọng số Pointwise qua MMIO}
 Quan sát tiếp theo là trọng số mô hình chỉ rộng tám bit nhưng giao dịch bus rộng 32 bit. Level~2 bổ sung vùng ghi packed: một word chứa bốn byte trọng số, theo thứ tự little-endian, được RTL mở rộng dấu vào các lane tương ứng. Giao diện scalar legacy được giữ để xử lý phần dư và bảo toàn ngữ nghĩa toán hạng cũ.
 
+Bảng~\ref{tab:packed-traffic} đối chiếu số lần ghi trọng số trước và sau khi đóng gói.
+
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
 \centering
@@ -125,6 +127,8 @@ Báo cáo post-route, thực hiện bằng Vivado~2024.1 trên \texttt{xczu7ev-f
 \section{Level 6: tile reuse cho đầu vào Conv0}
 Sau khi giảm tải trọng số Pointwise, Conv0 còn lặp nạp cùng patch cho từng kênh đầu ra. Level~6 áp dụng tile reuse bằng helper \texttt{TileConv0Hardware} cho đúng shape $28\times28\times1$ sang $28\times28\times16$, kernel $3\times3$, stride~1, padding~1. Vòng ngoài duyệt tile không gian; patch $5\times5$ được dựng và nạp một lần, rồi giữ qua toàn bộ 16 kênh đầu ra. Mỗi kênh vẫn tải kernel và trigger Conv như trước.
 
+Bảng~\ref{tab:conv0-reuse} tổng hợp lưu lượng dữ liệu của hai lịch Conv0.
+
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
 \centering
@@ -153,6 +157,8 @@ Theo bằng chứng mô phỏng lịch sử, cả bảy phiên bản giữ vecto
 \end{center}
 với dự đoán và nhãn kỳ vọng đều bằng~7. Tính bất biến này giới hạn ở phép thử đã ghi nhận. Các kiểm tra tensor tập trung bổ sung bằng chứng cho các miền dữ liệu được thử, không mở rộng thành chứng minh tương đương mọi đầu vào.
 
+Hình~\ref{fig:tile-reuse-placeholder} minh họa sự thay đổi phạm vi tái sử dụng patch khi Conv0 chuyển sang lịch tile-first.
+
 \begin{figure}[!ht]
 % Local spacing: template has a negative figure caption skip.
 \captionsetup{aboveskip=6pt,belowskip=0pt}
@@ -163,6 +169,8 @@ với dự đoán và nhãn kỳ vọng đều bằng~7. Tính bất biến này
 \end{figure}
 
 \section{Kết quả tối ưu hóa tổng thể}
+Bảng~\ref{tab:levels} tổng hợp số chu kỳ và mức cải thiện qua sáu mức tối ưu.
+
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
 \centering
@@ -185,6 +193,8 @@ Level 6 & 26\,523\,121 \\
 Từ hai đầu mút, tổng giảm 57,27\% và speedup tối ưu hóa đạt $2{,}3403\times$. Đây là lợi ích của chuỗi thay đổi trên hệ thống vốn đã tăng tốc. Các bước đầu giảm điều khiển và truyền trọng số Pointwise; các bước sau khai thác hình học DW2, cache PW1 và giữ input Conv0. Sự dịch chuyển mục tiêu cho thấy cần đo lại sau mỗi thay đổi, thay vì tiếp tục tối ưu một lớp theo tỷ trọng baseline ban đầu.
 
 \section{Phân tích theo lớp ở Level 6}
+Bảng~\ref{tab:level6-layers} trình bày số chu kỳ từng lớp của phiên bản Level~6.
+
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
 \centering
@@ -216,6 +226,8 @@ PW1 ở bảng cuối là 3\,318\,953 chu kỳ, so với 3\,318\,925 ở Level~5
 
 \section{So sánh với CPU-only RV32 tương ứng}
 Đối chứng CPU-only trong \texttt{evaluation/CPU\_BASELINE.md} biên dịch các kernel C tổng quát hiện có với \texttt{NATIVE\_RUN} và một ảnh kiểm thử. Nó dùng cùng PicoRV32, cấu hình nhân RV32IM, mô hình, ảnh nhúng, RAM 256~KiB, tensor CHW, offset và cận kích hoạt. Các accelerator vẫn tồn tại trong SoC nhưng assertion mô phỏng cấm truy cập các cửa sổ compute MMIO, kể cả bộ nhân độc lập. Phép nhân bằng lệnh CPU vẫn được phép; requantization ở đối chứng dùng C.
+
+Bảng~\ref{tab:speedup-baselines} phân biệt tỷ số tăng tốc theo hai mốc đối chứng.
 
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
@@ -270,3 +282,14 @@ Trong các điểm đã thử và có kết luận timing, $8{,}875$~ns là đi�
 Kết quả quét chỉ xác định điểm timing-clean cao nhất đã thử trong flow và cấu hình đó, không phải Fmax thực sự. Manifest của hai run hoàn tất nêu trên khớp nội dung tám tệp RTL hiện tại khi kiểm tra bằng Git blob hash. Điều này gắn báo cáo với mã RTL đang phân tích, nhưng không khắc phục việc flow thiếu ràng buộc chân/khởi tạo firmware và không thay thế kiểm chứng vật lý trên bo mạch. Xác nhận hoạt động vật lý của TinyMobileNet vẫn còn chờ.
 
 Đánh giá MyTinyMobileNetSoC trên ZCU106 đã hoàn thành đến post-route trong flow đánh giá hiện có. Flow của \texttt{my\_soc} chưa khởi tạo RAM bằng firmware và không tạo bitstream suy luận. Nhánh deployment A0 độc lập đã tạo bitstream smoke-test cho clock/reset/LED, nhưng chưa nạp hoặc kiểm thử vật lý trên bo mạch; nhánh này không chứa PicoRV32 hay các bộ tăng tốc. Vì vậy, triển khai TinyMobileNet vật lý, suy luận trên bo mạch và kiểm thử LED vật lý đều còn chờ xác nhận. Các chu kỳ mô phỏng chưa được chuyển thành khẳng định latency hoặc năng lượng đo trên bo mạch.
+
+\section{Kết luận và hướng phát triển}
+Luận văn hướng tới giảm chi phí suy luận CNN trên SoC RISC-V gọn nhẹ bằng đồng thiết kế phần cứng--phần mềm. MyTinyMobileNetSoC đã tích hợp PicoRV32, RAM dùng chung, firmware TinyMobileNet INT8 và các bộ tăng tốc MMIO, trong đó CPU điều phối dữ liệu và hoàn thiện đầu ra.
+
+Sáu mức tối ưu giảm số chu kỳ từ baseline đã tăng tốc 62\,071\,887 xuống 26\,523\,121, đạt $2{,}3403\times$ và giảm 57,27\%. So với kernel C tổng quát trên RV32 có 259\,218\,212 chu kỳ, tỷ số là $9{,}7733\times$; đối chứng này chưa được tối ưu chuyên sâu cho CPU. Khoảng đo bao gồm UART giữa các lớp, nên không phải độ trễ thuần của datapath.
+
+Độ chính xác host trên 10\,000 ảnh MNIST test là 94,64\% cho float, 94,42\% cho TFLite INT8 và 94,33\% cho native C. Kiểm tra RTL/SoC hỗ trợ tính đúng trong các trường hợp đã thử, không xác lập độ chính xác RTL trên toàn tập test hay tương đương mọi đầu vào. Hạn chế lưu trữ log/build lịch sử vẫn ảnh hưởng khả năng tái lập đầy đủ chuỗi số đo.
+
+Đánh giá FPGA trên ZCU106 đã hoàn tất đến post-route. Thiết kế cuối dùng 18\,010 CLB LUTs, 10\,805 registers, 64 RAMB36 và 685 DSP48E2; tại ràng buộc $8{,}875$~ns, WNS setup là $+0{,}056$~ns và WHS hold là $+0{,}012$~ns. Đây là điểm đạt timing cao nhất đã thử có kết luận, không phải Fmax thực sự và không thay thế kiểm chứng bo mạch.
+
+Giao diện MMIO và CPU điều phối giúp giữ cách tích hợp tường minh, nhưng chi phí phục vụ dữ liệu và tái lượng tử hóa vẫn giới hạn hiệu năng. Batch, cache và tái sử dụng tile giảm truyền lặp, đổi lại cần logic lưu trữ/điều khiển và các nhánh chuyên biệt theo kích thước. Công việc tiếp theo là hoàn thiện ảnh triển khai và kiểm chứng TinyMobileNet trên bo mạch vật lý, giảm chi phí phục vụ CPU/MMIO, đồng thời khảo sát khả năng tái sử dụng hoặc tổng quát hóa bộ tăng tốc rộng hơn. Mỗi hướng cần kiểm tra số học, đo chu kỳ và đánh giá tài nguyên/timing riêng trước khi kết luận lợi ích.

@@ -56,25 +56,34 @@ five Quant transactions, giving 62,720 in both schedules; stores remain
 
 Existing figure labels (including their `-placeholder` suffixes) are
 preserved to maintain references. Captions are Vietnamese; diagram labels
-are concise English. No technical code or Chapters 1–3 were edited.
+are concise English. Figure sources and technical code are unchanged in the final correction pass.
+Chapter 1 ownership wording was clarified separately.
 
-## Final validation
+## Current final validation — 2026-10-15
 
-- `latexmk -cd -pdf -interaction=nonstopmode -halt-on-error thesis_report/main.tex`
-  completed successfully with the current pdflatex toolchain.
-- All five figure pages were rasterized with `pdftoppm` and visually reviewed
-  for clipping, overlap, caption placement, font readability and whitespace.
-- No overfull boxes or underfull boxes originate from these figures or
-  Chapters 4–5. Existing template / earlier-chapter warnings remain unchanged
-  in scope (including duplicate page destinations and underfull paragraphs).
-- `git diff --check` passed. A direct loop-bound calculation verified the
-  2,116 valid Conv0 patch-source loads (33,856 before reuse).
-- Final printed figure pages: 4.1 = 40, 4.2 = 42, 4.3 = 45, 4.4 = 47,
-  5.1 = 54. Corresponding PDF page indices (one-based): 47, 49, 52, 54, 61.
-- PDF: 66 pages total; final numbered thesis page is 59.
-- Pointwise is the most information-dense figure, but its blocks and timeline
-  remain readable at the integrated size. No figure placeholders remain in
-  the thesis TeX sources.
-- No RTL/firmware builds or simulations were run: this change only adds
-  diagrams and replaces figure placeholders/captions. Pre-existing worktree
-  edits, including Chapters 1–3 edits already present at task start, were kept.
+- From `thesis_report/`, `latexmk -pdf -gg -interaction=nonstopmode
+  -halt-on-error main.tex` passed. `git diff --check` passed.
+- Current PDF: **53 A4 pages**; roman front matter i–viii plus cover,
+  main matter 1–44. Earlier pagination records have been removed.
+- Figure locations:
+
+  | Figure | Printed page | PDF page (one-based) |
+  |---|---:|---:|
+  | 4.1 network | 25 | 34 |
+  | 4.2 SoC | 26 | 35 |
+  | 4.3 Pointwise | 30 | 39 |
+  | 4.4 firmware | 32 | 41 |
+  | 5.1 Conv0 reuse | 39 | 48 |
+
+- All five pages were rendered with `pdftoppm` and visually inspected for
+  clipping, overlap, readable labels and caption placement. All five figures
+  have explicit body callouts; their labels and artwork are unchanged.
+- The final log has no overfull boxes, unresolved references/citations,
+  duplicate labels, duplicate PDF destinations or BibTeX warnings.
+  Remaining notices: vntex default input encoding, obsolete PGF snakes,
+  geometry over-specification and five earlier Chapter 2 underfull hboxes.
+- List of figures is PDF page 8; list of tables is PDF page 9.
+  See `../../evidence.md` for the full build audit and pending declaration/
+  cover identity decisions. These prevent final submission readiness.
+- No RTL/firmware/native builds or simulations were run in this documentation
+  pass. Numerical results and technical source were preserved. No commit made.

@@ -173,6 +173,9 @@ morekeywords={}
 \thesislayout
 
 \begin{document}
+% Cover identity requires author/template confirmation: category, date,
+% running footer (CO4041), and council. Reference covers differ.
+\hypersetup{pageanchor=false}
 
 \begin{titlepage}
 \begin{tikzpicture}[remember picture, overlay]
@@ -254,6 +257,8 @@ morekeywords={}
 % \input{Contents/ChuKy}
 % \newpage
 %%%%%%%%%%%%%%%%%INTRO%%%%%%%%%%%%%%%%%%%
+\pagenumbering{roman}
+\hypersetup{pageanchor=true}
 \input{Contents/LoiCamDoan}
 \newpage
 \input{Contents/LoiCamOn}
@@ -264,9 +269,9 @@ morekeywords={}
 \newpage
 \listoffigures
 \newpage
-%\listoftables
-\newpage
-\setcounter{page}{1}
+\listoftables
+\clearpage
+\pagenumbering{arabic}
 
 %%%%%%%%%%%%%%%%%CONTENTS%%%%%%%%%%%%%%%%%%%
 \input{Contents/GioiThieuDeTai}

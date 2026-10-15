@@ -59,7 +59,9 @@ Việc đánh giá được tách theo cấp bằng chứng. Độ chính xác m
 Khoảng đo tổng chu kỳ có chứa UART giữa các lớp và chi phí điều phối, nhưng chưa bao gồm argmax và báo cáo kết quả cuối. Báo cáo FPGA post-route được dùng để đánh giá tài nguyên và timing theo ràng buộc của từng run, tách biệt với kiểm chứng suy luận vật lý. Việc thiếu bộ log và danh tính build lịch sử đầy đủ cũng giới hạn khả năng tái lập đồng thời mọi mức tối ưu.
 
 \section{Các đóng góp của đề tài}
-Các đóng góp nằm trong phạm vi hiện thực và đánh giá hệ thống:
+Cần phân biệt thành phần kế thừa với phần công việc của sinh viên. PicoRV32 là lõi mã nguồn mở của bên thứ ba~\cite{YosysHQ2024}. Các khối Conv và Quant được kế thừa từ mã dự án trước: hai tệp \texttt{my\_conv\_accel.v} và \texttt{my\_quant\_accel.v} trong target hiện tại trùng nội dung với các tệp tương ứng trong \texttt{MyLeNet5SoC}; luận văn không nhận quyền tác giả ban đầu đối với các khối này. TensorFlow/Keras, TFLite, dữ liệu MNIST và các công cụ biên dịch, mô phỏng, FPGA là thành phần bên ngoài được sử dụng.
+
+Phần công việc của sinh viên trong đề tài tập trung vào tích hợp MyTinyMobileNetSoC và đường firmware suy luận TinyMobileNet, tích hợp DW/PW cùng giao diện thanh ghi và MMIO, thực hiện tối ưu Level~1--6 (bao gồm PW batch/cache, tái sử dụng phần cứng cho DW2 và lịch Conv0 tile-first), tổ chức script/quy trình đánh giá trong target hiện tại và chuẩn bị đánh giá, triển khai FPGA. Phạm vi này không bao hàm quyền tác giả đối với lõi CPU, các khối kế thừa hoặc framework/công cụ bên ngoài. Các đóng góp nằm trong phạm vi hiện thực và đánh giá hệ thống:
 \begin{itemize}
     \item \textbf{Tích hợp hệ thống:} xây dựng đường suy luận TinyMobileNet INT8 trên PicoRV32 với các bộ tăng tốc Conv, Quant, Depthwise và Pointwise giao tiếp qua MMIO do CPU điều khiển.
     \item \textbf{Đồng thiết kế phần cứng--phần mềm:} xác định phân công toán tử, duy trì fallback trên CPU và tổ chức tường minh các bước tái lượng tử hóa, hậu xử lý cùng di chuyển dữ liệu.

@@ -52,6 +52,8 @@ GAP thu gọn mỗi kênh bằng trung bình trên toàn bộ miền không gian
 \end{equation}
 Biểu thức thứ hai là lớp FC, ánh xạ vector đặc trưng sang điểm số phân loại. Trong GAP, CPU cộng offset đầu vào trước khi lấy trung bình, chia độ lớn tổng bằng thuật toán dịch--trừ và làm tròn độ lớn lên khi phần dư đạt ít nhất nửa số phần tử, sau đó khôi phục dấu. Giá trị trung bình này còn qua tái lượng tử hóa, offset đầu ra và clamp để tạo vector INT8 $g$ mà FC sử dụng; do đó $\bar{g}$ không phải trực tiếp là tensor đầu ra GAP. Mạng thực thi trả về điểm số trước Softmax; nhãn được chọn bằng argmax, không diễn giải điểm số INT8 là xác suất.
 
+Hình~\ref{fig:network-placeholder} minh họa luồng tensor và phân công xử lý giữa CPU với phần cứng.
+
 \begin{figure}[!ht]
 % Local spacing: template has a negative figure caption skip.
 \captionsetup{aboveskip=6pt,belowskip=0pt}
@@ -65,6 +67,8 @@ Biểu thức thứ hai là lớp FC, ánh xạ vector đặc trưng sang điể
 SoC gồm PicoRV32, RAM dùng chung, UART, thanh ghi LED và năm ngoại vi tính toán: bộ nhân độc lập, Conv, Quant, Depthwise và Pointwise. CPU là chủ thể phát giao dịch bộ nhớ. Các bộ tăng tốc nhận toán hạng từ thanh ghi nội bộ; chúng không tự truy cập RAM. Do đó, RAM dùng chung cho mã và dữ liệu không đồng nghĩa bộ tăng tốc có cổng đọc bộ nhớ chung hay khả năng DMA.
 
 Bus sử dụng các tín hiệu \texttt{mem\_valid}, \texttt{mem\_ready}, địa chỉ, dữ liệu đọc/ghi và byte-enable \texttt{mem\_wstrb}. Bộ giải mã trong \texttt{my\_soc.v} chọn RAM hoặc ngoại vi theo địa chỉ. Một giao dịch hoàn tất khi yêu cầu hợp lệ được đáp ứng bởi ready. Với kết quả batch của bộ tăng tốc Pointwise chưa sẵn sàng, ready bị giữ lại theo \texttt{rvalid}; CPU chờ trên bus thay vì chạy vòng polling.
+
+Bảng~\ref{tab:mmio-current} liệt kê bản đồ địa chỉ RAM và các ngoại vi của hệ thống.
 
 \begin{table}[!ht]
 \renewcommand{\arraystretch}{1.12}
@@ -87,6 +91,8 @@ LED & \texttt{0x03000000} \\
 \end{tabular}
 \end{table}
 UART có thanh ghi chia tần và dữ liệu tại hai địa chỉ tương ứng. LED cung cấp trạng thái do firmware ghi. Bộ nhân độc lập tồn tại trong SoC nhưng không được đường suy luận TinyMobileNet sử dụng; không được nhầm ngoại vi này với khả năng nhân của CPU hoặc các bộ nhân nằm trong accelerator.
+
+Hình~\ref{fig:soc-placeholder} minh họa kiến trúc SoC và đường giao tiếp MMIO do CPU điều phối.
 
 \begin{figure}[!ht]
 % Local spacing: template has a negative figure caption skip.
@@ -149,6 +155,8 @@ PW1 dùng cache trọng số thường trú gồm $32\times128$ bit, lưu 16 tr�
 
 Ở baseline, các lớp Pointwise chiếm phần lớn thời gian đo trong các lớp. Điều này xuất phát từ tích vô hướng trên nhiều kênh và việc lặp lại truyền trọng số cho mỗi vị trí; số phép toán thấp hơn tích chập chuẩn không tự bảo đảm thời gian thực thi thấp nếu bỏ qua MMIO. Chương tối ưu hóa phân tích quá trình giảm chi phí này.
 
+Hình~\ref{fig:pw-placeholder} minh họa datapath dùng chung và cơ chế batch/cache của Pointwise.
+
 \begin{figure}[!ht]
 % Local spacing: template has a negative figure caption skip.
 \captionsetup{aboveskip=6pt,belowskip=0pt}
@@ -172,6 +180,8 @@ Input $\rightarrow$ Conv0 $\rightarrow$ DW1 $\rightarrow$ PW1 $\rightarrow$ DW2\
 $\rightarrow$ PW2 $\rightarrow$ DW3 $\rightarrow$ PW3 $\rightarrow$ GAP $\rightarrow$ FC $\rightarrow$ prediction.
 \end{center}
 Ảnh đầu vào INT8 được đọc từ dữ liệu kiểm thử nhúng. Sau mỗi lớp, tensor đầu ra trong RAM trở thành đầu vào lớp kế tiếp. FC tạo vector điểm số; CPU chọn phần tử lớn nhất để xác định nhãn. Cách tổ chức này giữ quyền kiểm soát luồng ở firmware và cho phép thay đổi lịch cấp dữ liệu mà vẫn bảo toàn thứ tự bias, requantization, offset, clamp và lưu tensor.
+
+Hình~\ref{fig:flow-placeholder} minh họa luồng firmware từ khởi động đến báo cáo kết quả.
 
 \begin{figure}[!ht]
 % Local spacing: template has a negative figure caption skip.
