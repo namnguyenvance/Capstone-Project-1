@@ -1,8 +1,9 @@
 \section{Kiến trúc TinyMobileNet hiện thực}
 \subsection{Cấu trúc mạng và kích thước tensor}
-TinyMobileNet hiện thực gồm lớp tích chập đầu vào, ba cặp depthwise--pointwise, phép lấy trung bình toàn cục và lớp kết nối đầy đủ. Bảng~\ref{tab:network-current} mô tả kích thước theo thứ tự cao $\times$ rộng $\times$ kênh để dễ đọc; cách lưu trong bộ nhớ vẫn là CHW. Đây là mạng thu gọn đang chạy trong firmware, không phải khẳng định hiện thực đầy đủ MobileNetV2.
+Mạng gồm Conv0, ba cặp depthwise--pointwise, GAP và FC. Bảng~\ref{tab:network-current} trình bày kích thước theo thứ tự cao $\times$ rộng $\times$ kênh; dữ liệu vẫn lưu theo CHW. Đây là mạng thu gọn được firmware thực thi, không phải toàn bộ MobileNetV2.
 
 \begin{table}[!ht]
+\renewcommand{\arraystretch}{1.12}
 \centering
 \caption{Các lớp của TinyMobileNet và phân công tính toán ở Level 6}
 \label{tab:network-current}
@@ -42,8 +43,7 @@ Các kênh không phụ thuộc nhau trong bước này. Pointwise convolution k
 \begin{equation}
  a_{o,y,x}=b_o+\sum_c w_{o,c}\widetilde{x}_{c,y,x}.
 \end{equation}
-Cặp depthwise--pointwise tạo thành tích chập tách theo chiều sâu (depthwise-separable convolution): bước đầu xử lý không gian, bước sau trộn kênh. Với kernel $K\times K$, số hạng nhân--cộng trên một vị trí lần lượt là $K^2C_{\rm in}C_{\rm out}$ đối với tích chập chuẩn và $K^2C_{\rm in}+C_{\rm in}C_{\rm out}$ đối với cặp tách. Đây là đếm toán học, không phải số chu kỳ thực thi; truyền MMIO có thể làm thay đổi thứ tự các nút thắt hiệu năng.
-% TODO: literature citation
+Cặp depthwise--pointwise tạo thành tích chập tách theo chiều sâu (depthwise-separable convolution): bước đầu xử lý không gian, bước sau trộn kênh~\cite[Section~3.1]{howard2017mobilenets}. Với kernel $K\times K$, số hạng nhân--cộng trên một vị trí lần lượt là $K^2C_{\rm in}C_{\rm out}$ đối với tích chập chuẩn và $K^2C_{\rm in}+C_{\rm in}C_{\rm out}$ đối với cặp tách. Đây là đếm toán học, không phải số chu kỳ thực thi; truyền MMIO có thể làm thay đổi thứ tự các nút thắt hiệu năng.
 
 GAP thu gọn mỗi kênh bằng trung bình trên toàn bộ miền không gian,
 \begin{equation}
@@ -53,12 +53,13 @@ GAP thu gọn mỗi kênh bằng trung bình trên toàn bộ miền không gian
 Biểu thức thứ hai là lớp FC, ánh xạ vector đặc trưng sang điểm số phân loại. Trong GAP, CPU cộng offset đầu vào trước khi lấy trung bình, chia độ lớn tổng bằng thuật toán dịch--trừ và làm tròn độ lớn lên khi phần dư đạt ít nhất nửa số phần tử, sau đó khôi phục dấu. Giá trị trung bình này còn qua tái lượng tử hóa, offset đầu ra và clamp để tạo vector INT8 $g$ mà FC sử dụng; do đó $\bar{g}$ không phải trực tiếp là tensor đầu ra GAP. Mạng thực thi trả về điểm số trước Softmax; nhãn được chọn bằng argmax, không diễn giải điểm số INT8 là xác suất.
 
 \begin{figure}[!ht]
+% Local spacing: template has a negative figure caption skip.
+\captionsetup{aboveskip=6pt,belowskip=0pt}
 \centering
-\fbox{\parbox{0.88\textwidth}{\centering Vị trí chờ sơ đồ TinyMobileNet: kích thước tensor, stride và phân công HW/SW.}}
-\caption{Vị trí chờ sơ đồ mạng TinyMobileNet hiện thực}
+\resizebox{0.93\textwidth}{!}{\input{Images/tinymobilenet/network}}
+\caption{Luồng tensor TinyMobileNet và phân công HW/SW; DW2 chọn bốn kết quả stride~2 từ cùng patch.}
 \label{fig:network-placeholder}
 \end{figure}
-% TODO figure: sơ đồ mới, đối chiếu main_tinymobilenet.c; không dùng hình mô hình cũ.
 
 \section{Kiến trúc MyTinyMobileNetSoC}
 SoC gồm PicoRV32, RAM dùng chung, UART, thanh ghi LED và năm ngoại vi tính toán: bộ nhân độc lập, Conv, Quant, Depthwise và Pointwise. CPU là chủ thể phát giao dịch bộ nhớ. Các bộ tăng tốc nhận toán hạng từ thanh ghi nội bộ; chúng không tự truy cập RAM. Do đó, RAM dùng chung cho mã và dữ liệu không đồng nghĩa bộ tăng tốc có cổng đọc bộ nhớ chung hay khả năng DMA.
@@ -66,6 +67,7 @@ SoC gồm PicoRV32, RAM dùng chung, UART, thanh ghi LED và năm ngoại vi tí
 Bus sử dụng các tín hiệu \texttt{mem\_valid}, \texttt{mem\_ready}, địa chỉ, dữ liệu đọc/ghi và byte-enable \texttt{mem\_wstrb}. Bộ giải mã trong \texttt{my\_soc.v} chọn RAM hoặc ngoại vi theo địa chỉ. Một giao dịch hoàn tất khi yêu cầu hợp lệ được đáp ứng bởi ready. Với kết quả batch của bộ tăng tốc Pointwise chưa sẵn sàng, ready bị giữ lại theo \texttt{rvalid}; CPU chờ trên bus thay vì chạy vòng polling.
 
 \begin{table}[!ht]
+\renewcommand{\arraystretch}{1.12}
 \centering
 \caption{Bản đồ địa chỉ hiện tại của MyTinyMobileNetSoC}
 \label{tab:mmio-current}
@@ -73,13 +75,13 @@ Bus sử dụng các tín hiệu \texttt{mem\_valid}, \texttt{mem\_ready}, đị
 \hline
 Khối & Địa chỉ byte \\
 \hline
-RAM & \texttt{0x00000000--0x0003FFFF} \\
+RAM & \texttt{0x00000000}--\texttt{0x0003FFFF} \\
 UART & \texttt{0x02000004 / 0x02000008} \\
-Multiplier & \texttt{0x02000010--0x0200001F} \\
-Conv & \texttt{0x02000100--0x020001FF} \\
-Quant & \texttt{0x02000200--0x020002FF} \\
-Depthwise & \texttt{0x02000300--0x020003FF} \\
-Pointwise & \texttt{0x02000400--0x020007FF} \\
+Multiplier & \texttt{0x02000010}--\texttt{0x0200001F} \\
+Conv & \texttt{0x02000100}--\texttt{0x020001FF} \\
+Quant & \texttt{0x02000200}--\texttt{0x020002FF} \\
+Depthwise & \texttt{0x02000300}--\texttt{0x020003FF} \\
+Pointwise & \texttt{0x02000400}--\texttt{0x020007FF} \\
 LED & \texttt{0x03000000} \\
 \hline
 \end{tabular}
@@ -87,12 +89,13 @@ LED & \texttt{0x03000000} \\
 UART có thanh ghi chia tần và dữ liệu tại hai địa chỉ tương ứng. LED cung cấp trạng thái do firmware ghi. Bộ nhân độc lập tồn tại trong SoC nhưng không được đường suy luận TinyMobileNet sử dụng; không được nhầm ngoại vi này với khả năng nhân của CPU hoặc các bộ nhân nằm trong accelerator.
 
 \begin{figure}[!ht]
+% Local spacing: template has a negative figure caption skip.
+\captionsetup{aboveskip=6pt,belowskip=0pt}
 \centering
-\fbox{\parbox{0.88\textwidth}{\centering Vị trí chờ sơ đồ SoC: PicoRV32, RAM, bus MMIO, UART, LED và năm ngoại vi tính toán; đường dữ liệu qua CPU.}}
-\caption{Vị trí chờ sơ đồ khối MyTinyMobileNetSoC}
+\resizebox{0.93\textwidth}{!}{\input{Images/tinymobilenet/soc}}
+\caption{CPU điều phối truyền dữ liệu giữa RAM và các ngoại vi MMIO; các bộ tăng tốc không truy cập RAM trực tiếp.}
 \label{fig:soc-placeholder}
 \end{figure}
-% TODO figure: không vẽ đường DMA hay cổng RAM trực tiếp của accelerator.
 
 \section{PicoRV32 và tổ chức bộ nhớ}
 Firmware được biên dịch với \texttt{-march=rv32im -mabi=ilp32}, môi trường freestanding và tối ưu hóa \texttt{-O2}. Cấu hình CPU bật phép nhân, bộ đếm và tắt phép chia phần cứng, ngắt cùng lệnh nén. Vì DIV/REM không được bật, ký hiệu RV32IM ở đây chỉ mô tả mục tiêu biên dịch và đường nhân đang dùng, không khẳng định mọi lệnh của phần mở rộng M đều khả dụng. Các phép chia cần thiết được thực hiện bằng phần mềm.
@@ -107,19 +110,21 @@ Kích hoạt và trọng số là \texttt{int8\_t}; bias và tích lũy là \tex
 
 Firmware luân phiên hai bộ đệm INT8 \texttt{buf\_a} và \texttt{buf\_b} trong RAM khi gọi từng lớp; GAP và FC có bộ đệm đầu ra riêng. RAM đọc đồng bộ, hỗ trợ ghi theo byte-enable và không xóa toàn bộ nội dung khi reset; reset chỉ xóa trạng thái ready của giao tiếp RAM. Trong mô phỏng, ảnh firmware được testbench nạp vào RAM; cơ chế đó không phải một boot loader trên FPGA. Flow đánh giá Vivado hiện tại không khởi tạo RAM bằng firmware và không chứng minh SoC có thể khởi động suy luận trên bo mạch.
 
-\section{Bộ tăng tốc tích chập Conv}
+\section{Bộ tăng tốc Conv}
 \texttt{my\_conv\_accel.v} chứa 25 thanh ghi ảnh cho patch $5\times5$, chín thanh ghi kernel $3\times3$ và chín thanh ghi kết quả. Các chỉ số thanh ghi theo word lần lượt là 0--24, 28--36 và 40--48; thanh ghi điều khiển ở chỉ số 60. Khi CPU ghi điều khiển, các biểu thức nhân--cộng tính chín cửa sổ $3\times3$ của patch và chốt kết quả tại cạnh clock. Đây là các biểu thức tính toán song song được chốt đồng bộ, không phải chuỗi PE truyền dữ liệu theo kiến trúc systolic hay pipeline streaming sâu.
 
 Các toán hạng lưu dưới dạng signed 32 bit; kết quả bị giới hạn ở 32 bit theo RTL. Bias và requantization không nằm trong khối Conv. Cờ done được đặt khi trigger và giữ giá trị đến reset; không có cơ chế tự xóa sau mỗi lần đọc như một số chú thích có thể gợi ý. Firmware hiện tại ghi toán hạng, trigger rồi đọc kết quả theo giao dịch bus, không dùng cờ done này như một vòng polling cho mỗi tile.
 
 Conv0 thực hiện tile reuse: dùng lại một patch cho toàn bộ kênh đầu ra theo lịch tile-first. Một tile đầy đủ tạo miền đầu ra $3\times3$; tại biên chỉ những phần tử thuộc tensor đầu ra mới được đọc và lưu. CPU vẫn tải kernel tương ứng từng kênh và thực hiện bias, offset đầu ra, clamp cùng lưu CHW. Tối ưu ở đây thay đổi lịch cấp dữ liệu, không thay đổi khối RTL.
 
-\section{Bộ tăng tốc tái lượng tử hóa}
+
+Việc tách bộ tăng tốc Conv và bộ tăng tốc Depthwise không xuất phát từ yêu cầu toán học bắt buộc: cả hai RTL hiện tại đều tính các cửa sổ $3\times3$ trên patch $5\times5$. Điểm khác nằm ở cách firmware sử dụng chúng. Tích chập chuẩn có thể cần cộng đóng góp từ nhiều kênh đầu vào, trong khi depthwise xử lý từng kênh độc lập; Conv0 hiện tại chỉ có một kênh đầu vào. Các cửa sổ MMIO và thanh ghi riêng giữ cách lập lịch và lập trình của hai đường xử lý đơn giản, nhưng phải trả chi phí nhân đôi phần cứng tính toán tương tự. Đây là đánh đổi của cấu trúc hiện có; chưa có tài liệu xác nhận đây là lý do lịch sử dẫn đến quyết định tách khối. Một cấu trúc dùng chung sẽ cần được đánh giá riêng về điều phối, giao tiếp và tài nguyên.
+
+\section{Bộ tăng tốc lượng tử}
 \subsection{Giao diện và chuỗi xử lý}
 Bộ tăng tốc lượng tử (quantization accelerator, ký hiệu Quant trong bản đồ MMIO) nhận tích lũy, multiplier và lượng dịch tại các offset \texttt{0x00}, \texttt{0x04}, \texttt{0x08}; kết quả và điều khiển tại \texttt{0x0C}, \texttt{0x10}. Firmware thực hiện ba lần ghi tham số, một lần ghi trigger và một lần đọc kết quả. RTL nhân signed 32 bit để tạo tích 64 bit, thêm nudge phụ thuộc dấu, dịch phải số học và áp dụng phép chia làm tròn theo lũy thừa hai.
 
-Ở mức biểu diễn lượng tử, $r\simeq S(q-z)$ liên hệ giá trị thực với số nguyên, scale $S$ và zero-point $z$. Để đưa tích lũy sang miền đầu ra, firmware dùng multiplier và shift đã trích xuất từ mô hình. Quy ước hiện tại là shift dương tương ứng dịch phải; shift âm được firmware chuyển thành dịch trái tích lũy trước khi gọi bộ tăng tốc lượng tử với lượng dịch phải bằng không. Các lớp tích chập dùng tham số theo kênh.
-% TODO: literature citation
+Ở mức biểu diễn lượng tử, $r\simeq S(q-z)$ liên hệ giá trị thực với số nguyên, scale $S$ và zero-point $z$~\cite[Section~2.1, Eq.~(1)]{jacob2018quantization}. Để đưa tích lũy sang miền đầu ra, firmware dùng multiplier và shift đã trích xuất từ mô hình. Quy ước hiện tại là shift dương tương ứng dịch phải; shift âm được firmware chuyển thành dịch trái tích lũy trước khi gọi bộ tăng tốc lượng tử với lượng dịch phải bằng không. Các lớp tích chập dùng tham số theo kênh.
 
 Sau khi nhận kết quả từ bộ tăng tốc lượng tử, CPU cộng offset đầu ra và giới hạn trong miền kích hoạt được truyền vào hàm. Đường suy luận hiện tại dùng cận đầy đủ $[-128,127]$, rồi lưu INT8. Vì vậy, clamp INT8 là bước phần mềm; thanh ghi đầu ra của bộ tăng tốc lượng tử vẫn là 32 bit. Không được mô tả bộ tăng tốc lượng tử như khối tự thực hiện trọn vẹn bias, clamp và lưu đầu ra.
 
@@ -128,27 +133,30 @@ Hàm native C chia tích đã thêm nudge cho $2^{31}$ bằng phép chia số ng
 
 Do đó, sự trùng điểm số cuối trên ảnh kiểm thử chỉ là bằng chứng cho lần chạy đó. Nó không chứng minh native C, RTL và TFLite tương đương từng bit cho mọi dữ liệu. Mô hình tham khảo có thể chứa ReLU6 hoặc Softmax trong đồ thị, trong khi firmware dùng cận INT8 đầy đủ và bỏ Softmax; cần tách độ chính xác mô hình, mức đồng thuận dự đoán và tính tương đương của tối ưu hóa.
 
+% Avoid splitting the opening Depthwise paragraph at the page foot.
+\newpage
 \section{Bộ tăng tốc Depthwise}
 Bộ tăng tốc \texttt{my\_dw\_conv\_accel.v} xử lý patch $5\times5$ bằng kernel $3\times3$, tạo chín kết quả cửa sổ tương tự Conv nhưng được firmware cấp dữ liệu riêng cho từng kênh. Tính độc lập giữa các kênh cho phép tải kernel một lần cho kênh đang xử lý rồi di chuyển qua các tile. Bias và tham số requantization cũng được chọn theo kênh đó.
 
-DW1 có stride~1 nên dùng trực tiếp các vị trí kết quả trong tile. Với DW2 stride~2, firmware lấy bốn kết quả có chỉ số 0, 2, 6, 8 từ cùng patch, tạo tile đầu ra $2\times2$. RTL không có bộ tạo địa chỉ stride~2 riêng; bước nhảy và lựa chọn vị trí kết quả do phần mềm thực hiện. Nhánh này chỉ áp dụng cho shape DW2 đã xác định trong dispatcher. DW3 cũng có stride~2 nhưng kích thước khác, nên vẫn chạy hàm \texttt{DWStride2CPU}; requantization của DW3 tiếp tục dùng bộ tăng tốc lượng tử. Đối với DW2 hiện tại, lời gọi truyền padding trái/trên bằng không; tọa độ nguồn của patch là $(2x_o-p_x,2y_o-p_y)$. Nhánh tăng tốc kiểm tra kích thước, kernel, stride và depth multiplier; padding được dùng để tính tọa độ, không phải một điều kiện shape bổ sung của dispatcher.
+DW1 có stride~1 nên dùng trực tiếp các vị trí kết quả trong tile. Với DW2 stride~2, firmware lấy bốn kết quả có chỉ số 0, 2, 6, 8 từ cùng patch, tạo tile đầu ra $2\times2$. RTL không có bộ tạo địa chỉ stride~2 riêng; bước nhảy và lựa chọn vị trí kết quả do phần mềm thực hiện. Nhánh này chỉ áp dụng cho shape DW2 đã xác định trong dispatcher. DW3 có stride~2 nhưng không thuộc shape được nhánh phần cứng hiện tại bao phủ, nên chạy hàm \texttt{DWStride2CPU} để tích lũy; requantization vẫn dùng bộ tăng tốc lượng tử. Đây là giới hạn bao phủ của dispatcher/hiện thực hiện tại, không chứng minh DW3 không thể tái sử dụng phần cứng về nguyên lý. Đối với DW2 hiện tại, lời gọi truyền padding trái/trên bằng không; tọa độ nguồn của patch là $(2x_o-p_x,2y_o-p_y)$. Nhánh tăng tốc kiểm tra kích thước, kernel, stride và depth multiplier; padding được dùng để tính tọa độ, không phải một điều kiện shape bổ sung của dispatcher.
 
 \section{Bộ tăng tốc Pointwise}
 Pointwise tính tích vô hướng giữa vector kích hoạt tại một vị trí và vector trọng số của kênh đầu ra. RTL có bộ đệm tối đa 64 toán hạng đầu vào và trọng số legacy 32 bit. Một cây cộng dùng chung kết hợp các tích; DEPTH chọn số lane hoạt động. Phép nhân và cộng được giới hạn theo kết quả 32 bit, không có tích lũy mở rộng không giới hạn.
 
-Các chế độ phát triển thêm gồm ghi packed bốn trọng số INT8 trên một word và batch bốn kênh đầu ra. Batch thông thường giữ chung vector đầu vào, snapshot DEPTH khi nhận trigger và lần lượt tính các bank bằng cùng datapath. Ở chế độ cache, độ sâu tính toán được cố định là 16 thay vì lấy từ DEPTH. Bốn kết quả cùng trở nên hợp lệ sau bốn cạnh tính toán; không phải bốn datapath chạy đồng thời. SoC dùng \texttt{rvalid} riêng cho các thanh ghi BATCH\_RESULT để chặn việc đọc kết quả cũ hoặc chưa hoàn tất; các lần đọc legacy RESULT không dùng cơ chế chặn này. Firmware đọc trực tiếp thanh ghi kết quả; độ trễ được phản ánh bằng stall bus.
+Các chế độ phát triển thêm gồm ghi packed bốn trọng số INT8 trên một word và batch bốn kênh đầu ra. Trong chương này, batch là nhóm bốn kênh đầu ra tại cùng một vị trí không gian, không phải nhóm nhiều ảnh đầu vào. Batch thông thường giữ chung vector đầu vào, snapshot DEPTH khi nhận trigger và lần lượt tính các bank bằng cùng datapath. Ở chế độ cache, độ sâu tính toán được cố định là 16 thay vì lấy từ DEPTH. Bốn kết quả cùng trở nên hợp lệ sau bốn cạnh tính toán; không phải bốn datapath chạy đồng thời. SoC dùng \texttt{rvalid} riêng cho các thanh ghi BATCH\_RESULT để chặn việc đọc kết quả cũ hoặc chưa hoàn tất; các lần đọc legacy RESULT không dùng cơ chế chặn này. Firmware đọc trực tiếp thanh ghi kết quả; độ trễ được phản ánh bằng stall bus.
 
-PW1 dùng cache trọng số thường trú gồm $32\times128$ bit, lưu 16 trọng số INT8 cho mỗi kênh đầu ra. Firmware nạp toàn bộ một lần trước khi xử lý 784 vị trí không gian, rồi chọn nhóm bốn kênh cho mỗi trigger. Bitmap hợp lệ ngăn sử dụng cache trước khi đủ dữ liệu; reset hoặc bắt đầu preload mới hủy trạng thái hợp lệ, không yêu cầu xóa nội dung vật lý của các hàng cache. Nhánh cache chỉ được chọn cho input/output không gian $28\times28$, 16 kênh vào, 32 kênh ra, kernel $1\times1$, stride~1 và padding bằng không. PW2 và PW3 dùng đường batch với trọng số được nạp theo vị trí, không dùng cache PW1 có shape cố định.
+PW1 dùng cache trọng số thường trú gồm $32\times128$ bit, lưu 16 trọng số INT8 cho mỗi kênh đầu ra. Firmware nạp toàn bộ một lần trong mỗi lời gọi PW1 trước khi xử lý 784 vị trí không gian, rồi chọn nhóm bốn kênh cho mỗi trigger. Mỗi ảnh mới gọi PW1 lại thực hiện preload mới; firmware hiện tại không khai thác việc giữ cache qua nhiều ảnh. Bitmap hợp lệ ngăn sử dụng cache trước khi đủ dữ liệu; reset hoặc bắt đầu preload mới hủy trạng thái hợp lệ, không yêu cầu xóa nội dung vật lý của các hàng cache. Nhánh cache chỉ được chọn cho input/output không gian $28\times28$, 16 kênh vào, 32 kênh ra, kernel $1\times1$, stride~1 và padding bằng không. PW2 và PW3 dùng đường batch với trọng số được nạp theo vị trí, không dùng cache PW1 có shape cố định.
 
 Ở baseline, các lớp Pointwise chiếm phần lớn thời gian đo trong các lớp. Điều này xuất phát từ tích vô hướng trên nhiều kênh và việc lặp lại truyền trọng số cho mỗi vị trí; số phép toán thấp hơn tích chập chuẩn không tự bảo đảm thời gian thực thi thấp nếu bỏ qua MMIO. Chương tối ưu hóa phân tích quá trình giảm chi phí này.
 
 \begin{figure}[!ht]
+% Local spacing: template has a negative figure caption skip.
+\captionsetup{aboveskip=6pt,belowskip=0pt}
 \centering
-\fbox{\parbox{0.88\textwidth}{\centering Vị trí chờ sơ đồ Pointwise: INPUT dùng chung, bank/cache trọng số, cây tích vô hướng dùng chung, điều khiển batch và rvalid.}}
-\caption{Vị trí chờ sơ đồ datapath và giao tiếp Pointwise}
+\resizebox{0.93\textwidth}{!}{\input{Images/tinymobilenet/pointwise}}
+\caption{Pointwise dùng chung một datapath cho các bank và cache PW1; bốn kết quả batch hợp lệ sau bốn cạnh tính toán.}
 \label{fig:pw-placeholder}
 \end{figure}
-% TODO figure: thể hiện batch tuần tự, không vẽ bốn MAC tree độc lập.
 
 \section{Điều phối bằng firmware}
 Điểm vào \texttt{main\_tinymobilenet.c} gọi lần lượt các toán tử trong \texttt{dl\_ops.c} với kích thước, trọng số, bias, offset và tham số lượng tử của từng lớp. Dispatcher chọn helper chuyên biệt cho Conv0 và PW1, đường batch cho PW2/PW3, đường bộ tăng tốc Depthwise cho DW1/DW2 và fallback CPU cho DW3. Các shape ngoài điều kiện hỗ trợ tiếp tục dùng đường tổng quát.
@@ -166,9 +174,10 @@ $\rightarrow$ PW2 $\rightarrow$ DW3 $\rightarrow$ PW3 $\rightarrow$ GAP $\righta
 Ảnh đầu vào INT8 được đọc từ dữ liệu kiểm thử nhúng. Sau mỗi lớp, tensor đầu ra trong RAM trở thành đầu vào lớp kế tiếp. FC tạo vector điểm số; CPU chọn phần tử lớn nhất để xác định nhãn. Cách tổ chức này giữ quyền kiểm soát luồng ở firmware và cho phép thay đổi lịch cấp dữ liệu mà vẫn bảo toàn thứ tự bias, requantization, offset, clamp và lưu tensor.
 
 \begin{figure}[!ht]
+% Local spacing: template has a negative figure caption skip.
+\captionsetup{aboveskip=6pt,belowskip=0pt}
 \centering
-\fbox{\parbox{0.88\textwidth}{\centering Vị trí chờ lưu đồ firmware: khởi động, lập lịch lớp, chuẩn bị tile/vector, MMIO, hậu xử lý, argmax và báo cáo.}}
-\caption{Vị trí chờ lưu đồ suy luận đầu cuối}
+\resizebox{0.93\textwidth}{!}{\input{Images/tinymobilenet/firmware}}
+\caption{Firmware thực thi tuần tự, luân phiên bộ đệm và gọi Quant riêng; khoảng đo kết thúc trước argmax và báo cáo.}
 \label{fig:flow-placeholder}
 \end{figure}
-% TODO figure: đối chiếu các nhánh dispatcher và ranh giới đo chu kỳ.

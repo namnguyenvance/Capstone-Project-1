@@ -193,3 +193,256 @@ establish rendered pagination, table widths, float placement or font rendering.
   documentation/walkthrough/report sources; historical raw simulation log and
   build completeness remains a reproducibility limitation.
 - No commit made; no firmware, model, RTL, evaluation code or FPGA flow changed.
+
+
+## Presentation review — 2026-10-15
+
+This section supersedes the earlier engine-unavailable/build-pending status.
+No technical claims were added in this presentation pass. Chapters 1–3,
+technical sources, main preamble, margins, title page, chapter style, headers,
+footers and bibliography style were left unchanged. Two Chapter 1–3 files
+already had user edits at the start of the pass; those were preserved byte-for-byte.
+
+### Build and visual inspection
+
+From `thesis_report/`:
+
+```sh
+latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
+```
+
+Build succeeded with latexmk 4.87 / pdfLaTeX; final PDF is 60 A4 pages.
+Chapters 4–5 occupy PDF pages 45–58 (printed pages 38–51). Reviewed rendered
+pages with pdftoppm, including reinspection of changed page breaks and floats.
+
+Local edits in `Contents/PhuongPhap/KienTruc.tex` and
+`Contents/ToiUu/ToiUu.tex`:
+
+- Override negative figure-caption spacing only inside the five new placeholder
+  floats; add small internal padding so captions no longer overlap their boxes.
+- Increase table row spacing locally to 1.12; numeric columns remain right aligned.
+- Typeset MMIO ranges with a text en dash between monospaced endpoints.
+- Permit line breaks within the Vivado run identifier and recast its introductory
+  sentence without changing the tool, device, run ID or timing values.
+- Shorten the network introduction without changing meaning, avoiding a single
+  continuation line at the top of the following page; standardize Conv and
+  quantization section titles to the established terminology.
+- Move the Conv0 traffic table to a paragraph boundary. Start the Depthwise and
+  final per-layer-analysis sections on a new page to keep their opening material
+  together. Recheck these local breaks when real figures replace placeholders.
+
+Chapter 5 tables have distinct roles and remain as tables: the accelerated
+baseline through Level 6 progression gives historical totals; the Level 6 table
+shows remaining layer costs; the comparison table distinguishes accelerated and
+CPU-only denominators. No redundant chart or new numerical column was added.
+The baseline row retains its existing name, rather than inventing a new version.
+
+### Figure TODO specifications (no figures generated)
+
+| Existing figure | What the figure should show, using only existing chapter claims | Recommended form |
+|---|---|---|
+| 4.1, `fig:network-placeholder` | Input → Conv0 → DW1 → PW1 → DW2 → PW2 → DW3 → PW3 → GAP → FC → prediction; existing tensor shapes/strides and HW/SW allocation | Data-flow diagram; retain the existing tensor table for exact dimensions |
+| 4.2, `fig:soc-placeholder` | PicoRV32, shared RAM, MMIO bus, UART, LED and the five existing compute peripherals; CPU-mediated operand/result transfer, no DMA links | Architecture block diagram |
+| 4.3, `fig:pw-placeholder` | Shared INPUT, weight banks/cache selection, shared dot-product tree, sequential batch control, result publication and rvalid; distinguish cached PW1 from PW2/PW3 | Architecture block diagram |
+| 4.4, `fig:flow-placeholder` | Boot and layer schedule, dispatcher selection, CPU data preparation, MMIO trigger/read, software post-processing, GAP/FC accumulation and prediction/reporting | Data-flow diagram |
+| 5.1, `fig:tile-reuse-placeholder` | Side-by-side Conv0 schedules: repeated patch load by output channel versus one patch load reused across output channels; existing valid-boundary handling | Data-flow diagram, not an optimization progression or cycle comparison chart |
+
+No additional chart is required for the three Chapter 5 summary tables. Figure
+scale and final pagination must be revisited after actual artwork is supplied.
+
+### Final warnings and review status
+
+- `git diff --check`: passed.
+- Entire document: zero overfull boxes, 22 pre-existing underfull hbox notices,
+  eight pre-existing `!h`→`!ht` float notices, six package warnings (vntex input
+  encoding default, obsolete PGF snakes and four geometry over-specification
+  warnings). These occur before Chapter 4; the template was not redesigned.
+- Chapters 4–5: no overfull/underfull box or LaTeX/package warning in their log span.
+- No unresolved references/citations or multiply-defined-label warnings.
+- Five figure TODOs and two literature citation TODO comments remain: the
+  depthwise-separable-convolution discussion and affine quantization discussion.
+  The citation TODOs are editorial placeholders, not undefined citation keys.
+- Ready for visual/technical human review with visibly labelled figure placeholders;
+  not a final submission layout until figures/citations are completed. No other
+  layout issue needs a manual decision at this stage. No commit made.
+
+## Reviewer-approved corrections — 2026-10-15
+
+This entry supersedes earlier descriptions where the new reviewer corrections
+provide additional evidence or more precise scope. No raw artifact was copied,
+no new experiment was claimed, and no technical source was changed.
+
+### 10k host accuracy provenance
+
+- Approved reviewer/user findings supply the verified full-test accuracies:
+  Float Keras 94.64%, TFLite INT8 94.42%, native C 94.33%, on 10,000 MNIST
+  test images. These are host/model/native accuracies only. No prediction
+  agreement is inferred from their differences; no 10k RTL claim is made.
+- Reproduction procedure and environment: original repository
+  `RISCVAIoT/MyTinyMobileNetSoC/evaluation/README.md` and
+  `evaluation/evaluate_mnist.py`. The README records Windows Python 3.10.8,
+  TensorFlow 2.18.0, Keras 3.7.0, NumPy 2.0.2 for references; WSL Python 3.14.4
+  and GCC 15.2.0 for native; preprocessing and native arithmetic qualifications.
+- The procedure emits `results.json`, `summary.txt`, `predictions.csv`, hashes,
+  native log and disagreement records into an external output directory. It
+  does not record these three final accuracy values in the checked-in README.
+- Previously designated `/tmp/tmn_accuracy_10k/` is absent in this session.
+  No repository-original raw accuracy results were located. Thus the numbers
+  are reviewer-confirmed results, **not independently re-read from raw results
+  during this editing pass**. Preserve/recover the original output at its source
+  for primary-source reproducibility before final submission. Do not fabricate
+  a repository log path or imply this limitation is fixed by the evaluation script.
+
+### CPU-only and matched Level 6 provenance
+
+- CPU-only source: `RISCVAIoT/MyTinyMobileNetSoC/evaluation/CPU_BASELINE.md`,
+  especially Definition, Measurement/correctness limits and Measured result;
+  executable procedure is `evaluation/run_cpu_baseline.py`.
+  It records 259,218,212 cycles, GCC 16.1.0, Verilator 5.051, no-compute-MMIO
+  assertion, score vector and measurement-boundary observations.
+- Historical Level 6 source: root walkthrough §9.6; 26,523,121 total cycles and
+  its nine layer counts. Their sum is 26,390,722; difference 132,399. GAP+FC
+  fraction is `(187380+50824)/26390722*100 = 0.902605...%` of layer time.
+- Current timing-boundary source: `main_tinymobilenet.c`, `total_start` before
+  the Conv0 message and `total_end` after the FC cycle message. Argmax, printing
+  scores/prediction and LED status are outside this interval. Each `layer_start`
+  follows its announcement and each `layer_end` precedes its cycle printout.
+  The 132,399-cycle difference has no independently measured UART/MMIO/setup
+  decomposition; do not assign it all to one mechanism.
+- Matched Level 6 provenance available from the earlier audit in this conversation:
+  `/tmp/tmn_level6_matched/results.json`, `simulation.log`, tool-version files
+  and `commands.json` were observed; summary total/layers matched historical
+  Level 6, score vector and prediction matched the CPU-only run, and all recorded
+  source SHA256 entries matched then-current sources. This was not a new run
+  performed by the thesis task. The task-created copies were subsequently removed
+  as requested. That external directory and `/tmp/tmn_cpu_baseline/` are now absent.
+  No durable matched-run original was found in the repository; the old audit is
+  a historical observation, not a currently re-verifiable raw result. The CPU
+  baseline README itself explicitly describes its Level 6 reference as historical.
+- Chapter 5 therefore bases the numerical comparison on the original CPU baseline
+  documentation and walkthrough, while retaining the missing-log/build limitation.
+  No invented matched-build identity or universal native/RTL equivalence is added.
+
+### Timing sweep and source identity
+
+Let `R = RISCVAIoT/MyTinyMobileNetSoC/fpga/zcu106/reports/`.
+
+| Run directory under R | Original evidence | Status / allowed conclusion |
+|---|---|---|
+| `20261011_221527_22836_8p875ns/` | `post_route/utilization.rpt`, CLB table and primitives; `post_route/timing_summary.rpt`, Design Timing Summary; metadata/status/manifest | CLB LUTs 18,010; registers 10,805; RAMB36 64; DSP48E2 685; WNS +0.056 ns; WHS +0.012 ns. Highest tested timing-clean point in this sweep, not true Fmax or board validation. Final Level 6/current-design cost, not incremental cost of any one optimization. |
+| `20261011_213352_14700_8p75ns/` | `status.txt`, `post_route/timing_summary.rpt` | Completed at 8.750 ns, setup WNS −0.242 ns; next completed tighter point fails setup. |
+| `20261011_231608_8_8p8125ns/` | `status.txt`, `metadata.txt`, copied `evaluation.xdc` | Failed at synthesis-stage period assertion: clock period disagrees with metadata. No timing verdict; not a timing failure measurement and not an intermediate Fmax bound. |
+
+Both completed runs' `rtl_manifest.txt` entries were checked using
+`git hash-object RISCVAIoT/MyTinyMobileNetSoC/<filename>` in this pass. All eight
+entries match current source in both runs:
+
+| RTL file | Matching Git blob ID |
+|---|---|
+| `my_soc.v` | `76c9d55d6fcd54fda74e6ea144e5652c56a6b8d6` |
+| `picorv32.v` | `c493c2d25b26478e7bc02562d714e272deb7071c` |
+| `simpleuart.v` | `5ffef772ffe38d78ddda98a79a9f0db695274e88` |
+| `my_accel.v` | `7419cfef7398d2d3d6ce07891b019d8f857c6ebe` |
+| `my_conv_accel.v` | `e779e50fc6bad015a6121ddd89481ce5e63c74af` |
+| `my_quant_accel.v` | `3ad47e497b245d1f7556339b981d09727836ccb2` |
+| `my_dw_conv_accel.v` | `16c070a82837d460606d84e52ee62dc4a15fd509` |
+| `my_pw_conv_accel.v` | `585719bdc1b8cfd9b41f61dcdfe6f8ce81b97735` |
+
+These are the manifest's Git content hashes, not SHA256, firmware hashes or proof
+of a bootable board image. Constraints/metadata, tool/device and completed stage
+still determine interpretation. Physical TinyMobileNet validation remains pending.
+
+### Architecture and historical-check qualifications
+
+- Workload rationale and absence of MobileNetV2 inverted-residual/bottleneck
+  blocks: `train_model.py`, model-building function; actual layer calls in
+  `main_tinymobilenet.c`. The rationale is a thesis workload argument, not a
+  claim of universal model optimality.
+- Separate Conv/DW blocks: `my_conv_accel.v`, `my_dw_conv_accel.v`, separate
+  instances/windows in `my_soc.v`, and distinct loops in `dl_ops.c`. Similar
+  patch arithmetic supports a shared-versus-duplicated hardware trade-off;
+  no undocumented historical rationale is asserted.
+- DW3 coverage and PW1 lifetime: `dl_ops.c`, DW2 shape predicate,
+  `DWStride2CPU`, `Conv2D_TFLM` and `CachedPW1Hardware`. Every PW1 invocation
+  writes cache index 0 then preloads 128 words; no cross-image residency is used.
+- PW tensor comparisons derived from current layer dimensions:
+  PW1 `32*16=512` bytes / `28*28=784` positions;
+  PW2 `48*32=1536` bytes / `14*14=196` positions;
+  PW3 `64*48=3072` bytes / `7*7=49` positions.
+  This is capacity/reuse opportunity, not measured benefit for unimplemented caches.
+- Retained focused executable checks include `tb_pw_conv_accel.v`,
+  `tb_pw_bus.v`, `tb_pw_cache.v`, `tb_dw2_mapping.v`, `verify_pw_firmware.c`,
+  `verify_pw_cache.py`, `verify_dw2_firmware.c`/`.py` and the Makefile test targets.
+  These support the existence of regression coverage, not a claim that this
+  editing pass reran those tests or recovered all historical firmware versions.
+- Root walkthrough §9.6 remains the documented Level 1–6 historical source.
+  Full original logs/build identities for the series remain missing. Compiler,
+  dispatcher and MMIO causal explanations are identified as recorded attribution
+  or architectural inference, rather than independent cycle decompositions.
+
+### Validation of the reviewer-approved pass
+
+- `latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex` from
+  `thesis_report/`: passed; resulting PDF has 63 pages. Rendered and visually
+  checked the new verification/accuracy and FPGA tables and the reflowed cycle
+  analysis. No generated figures or new raw-evidence copies were introduced.
+- `git diff --check`: passed. Chapters 4–5 have no overfull/underfull hbox or
+  LaTeX/package warning in their log span; no unresolved references/citations
+  or duplicate labels. Pre-existing warnings outside these chapters remain.
+- Pre/post file-hash comparison: only `Contents/PhuongPhap/GioiThieu.tex`,
+  `Contents/PhuongPhap/KienTruc.tex`, `Contents/ToiUu/ToiUu.tex` and this register
+  changed during this pass. Chapters 1–3 (including their pre-existing user
+  edits), technical source, template and bibliography were preserved.
+- Reviewer corrections are applied; outstanding work is the five existing figure
+  placeholders, two literature citation TODOs and recovery/archival of original
+  host/matched/historical run evidence. Approved accuracy figures are included
+  with their provenance limitation, not presented as a newly executed experiment.
+- Ready for figure insertion and subsequent technical review. Final pagination
+  must be rechecked after artwork insertion. Physical board validation and true
+  Fmax characterization are outside this editing pass and remain pending.
+- No commit made.
+
+
+## Chapters 4–5 finalization — 2026-10-15
+
+- Added `howard2017mobilenets` (Howard et al., MobileNets, 2017,
+  https://arxiv.org/abs/1704.04861), verified against section 3.1 of the
+  primary paper. Citation is attached only to the conceptual explanation
+  of depthwise plus pointwise convolution in `KienTruc.tex`.
+- Added `jacob2018quantization` (Jacob et al., CVPR 2018, pp. 2704–2713,
+  https://arxiv.org/abs/1712.05877), verified against section 2.1, equation
+  (1). Citation is attached only to the general affine quantization model.
+  Native C / RTL / TFLite rounding and saturation caveats are unchanged.
+- Removed exactly the two resolved literature-citation TODO comments.
+  No TODO comments remain in the Chapter 4–5 source directories.
+- Corrected the nontechnical introduction sentence that still described
+  the now-integrated figures as placeholders. No technical claims changed.
+- Added thesis-local `.gitignore` rules for generated LaTeX auxiliary files,
+  logs and `/main.pdf`. These outputs were untracked; no tracked outputs
+  were removed. The review PDF remains available locally.
+- Re-audited all five figures against `my_soc.v`, `my_pw_conv_accel.v`,
+  `main_tinymobilenet.c`, `start.s` and `dl_ops.c`. Confirmed DW1 HW,
+  exact DW2 HW reuse, DW3 CPU + Quant, per-invocation PW1 preload over
+  784 positions, PW2/PW3 batch, GAP CPU + Quant, FC CPU + Quant,
+  CPU-mediated RAM/MMIO transfers, no DMA, standalone multiplier unused
+  by inference, and total measurement stopping before argmax/reporting/LED.
+  No figure source changes were necessary. Conv0 traffic was independently
+  checked again from loop bounds: writes 40,000 to 2,500; valid source loads
+  33,856 to 2,116; result reads 14,400 to 12,544; Quant 62,720 unchanged;
+  stores 12,544 unchanged. Loop-panel abstraction remains documented in
+  `Images/tinymobilenet/README.md`.
+- `latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex`, run in
+  `thesis_report/`, passed. `git diff --check` passed. `pdfinfo` reports
+  66 A4 pages. Figure pages remain 40, 42, 45, 47, 54 (printed numbering).
+  All five final figure pages and the new bibliography entries were visually
+  inspected. Citation-bearing prose was checked in the rendered PDF.
+- Final log has no unresolved references/citations, duplicate labels or
+  overfull boxes. Auxiliary-label counting also found no duplicates.
+  Remaining existing warnings: vntex default input encoding, obsolete TikZ
+  snakes library, geometry overspecification, adjusted `!h` floats, earlier
+  underfull paragraphs and duplicate PDF page destinations from restarted
+  page numbering. BibTeX retains its existing volume/number warning for
+  `he2021design`. These are outside the Chapter 4–5 cleanup scope.
+- Technical source files and Chapters 1–3 were unchanged during finalization;
+  hashes were checked. Pre-existing Chapter 1–3 working-tree edits remain
+  separate and must be excluded from the Chapters 4–5 commit. No commit made.

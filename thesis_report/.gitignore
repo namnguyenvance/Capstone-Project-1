@@ -1,0 +1,13 @@
+# Generated LaTeX output; keep review PDFs locally, out of commits.
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+/main.pdf
