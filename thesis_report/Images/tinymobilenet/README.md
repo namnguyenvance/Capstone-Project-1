@@ -12,7 +12,7 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 
 ## Source evidence and abstraction
 
-All technical sources below are in `RISCVAIoT/MyTinyMobileNetSoC/`.
+All technical sources below are in `MyTinyMobileNetSoC/`.
 
 - `network.tex` (4.1): dimensions and call order in `main_tinymobilenet.c`;
   dispatch and arithmetic in `dl_ops.c`, including `DWStride2CPU`, the

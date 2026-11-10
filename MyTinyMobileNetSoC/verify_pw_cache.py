@@ -92,7 +92,7 @@ def main():
  global T
  parser=argparse.ArgumentParser();parser.add_argument('--artifacts',type=Path);parser.add_argument('--baseline',default=BASELINE);a=parser.parse_args()
  T=(a.artifacts or Path(tempfile.mkdtemp(prefix='pw_cache_verify_',dir='/tmp'))).resolve();T.mkdir(parents=True,exist_ok=True)
- assert not T.is_relative_to(R.parents[1]),'generated artifacts must stay outside repository'
+ assert not T.is_relative_to(R.parent),'generated artifacts must stay outside repository'
  source=subprocess.check_output(['git','show',a.baseline+':RISCVAIoT/MyTinyMobileNetSoC/dl_ops.c'],cwd=R,text=True)
  for name,text in [('baseline',source),('candidate',(R/'dl_ops.c').read_text())]:
   p=T/(name+'.c');p.write_text(text)

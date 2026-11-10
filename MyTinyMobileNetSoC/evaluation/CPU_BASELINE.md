@@ -3,7 +3,7 @@
 Run from the repository root:
 
 ```sh
-python3 RISCVAIoT/MyTinyMobileNetSoC/evaluation/run_cpu_baseline.py \
+python3 MyTinyMobileNetSoC/evaluation/run_cpu_baseline.py \
   --output /tmp/tmn_cpu_baseline
 ```
 

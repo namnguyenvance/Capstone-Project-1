@@ -2,7 +2,7 @@
 
 ## Active target and architecture
 
-The active TinyMobileNet target is `RISCVAIoT/MyTinyMobileNetSoC/`.
+The active TinyMobileNet target is `MyTinyMobileNetSoC/`.
 Use `TinyMobileNet_RISCV_SoC_Walkthrough.md` as architectural context;
 verify details against current source.
 
@@ -17,7 +17,7 @@ DW stride-2, GAP, and FC use CPU arithmetic with hardware requantization.
 ## Directories
 
 - Active RTL, testbench, firmware, model data, and ML scripts:
-  `RISCVAIoT/MyTinyMobileNetSoC/`.
+  `MyTinyMobileNetSoC/`.
 - Active RTL top: `my_soc.v`; simulation top: `tb.v`.
 - Firmware entry: `start.s` → `main_tinymobilenet.c`.
 - Firmware operations: `dl_ops.c`, `quantize.c`; linker: `sections.lds`.
@@ -30,7 +30,7 @@ modify them unless explicitly requested.
 
 ## Build and simulation
 
-Run from `RISCVAIoT/MyTinyMobileNetSoC/`:
+Run from `MyTinyMobileNetSoC/`:
 
 - `make firmware.hex`: build firmware and generate RAM image.
 - `make sim.vvp`: compile RTL with Icarus Verilog.

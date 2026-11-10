@@ -43,7 +43,7 @@ Both reference PDFs were read via temporary text extracts; this final pass used
 
 ## Quantitative and architectural claims
 
-Let `T = RISCVAIoT/MyTinyMobileNetSoC/` and
+Let `T = MyTinyMobileNetSoC/` and
 `W = TinyMobileNet_RISCV_SoC_Walkthrough.md`.
 
 | Claim family in thesis | Evidence and exact location | Interpretation / limitation |
@@ -138,7 +138,7 @@ no new experiment was claimed, and no technical source was changed.
   test images. These are host/model/native accuracies only. No prediction
   agreement is inferred from their differences; no 10k RTL claim is made.
 - Reproduction procedure and environment: original repository
-  `RISCVAIoT/MyTinyMobileNetSoC/evaluation/README.md` and
+  `MyTinyMobileNetSoC/evaluation/README.md` and
   `evaluation/evaluate_mnist.py`. The README records Windows Python 3.10.8,
   TensorFlow 2.18.0, Keras 3.7.0, NumPy 2.0.2 for references; WSL Python 3.14.4
   and GCC 15.2.0 for native; preprocessing and native arithmetic qualifications.
@@ -154,7 +154,7 @@ no new experiment was claimed, and no technical source was changed.
 
 ### CPU-only and matched Level 6 provenance
 
-- CPU-only source: `RISCVAIoT/MyTinyMobileNetSoC/evaluation/CPU_BASELINE.md`,
+- CPU-only source: `MyTinyMobileNetSoC/evaluation/CPU_BASELINE.md`,
   especially Definition, Measurement/correctness limits and Measured result;
   executable procedure is `evaluation/run_cpu_baseline.py`.
   It records 259,218,212 cycles, GCC 16.1.0, Verilator 5.051, no-compute-MMIO
@@ -184,7 +184,7 @@ no new experiment was claimed, and no technical source was changed.
 
 ### Timing sweep and source identity
 
-Let `R = RISCVAIoT/MyTinyMobileNetSoC/fpga/zcu106/reports/`.
+Let `R = MyTinyMobileNetSoC/fpga/zcu106/reports/`.
 
 | Run directory under R | Original evidence | Status / allowed conclusion |
 |---|---|---|
@@ -193,7 +193,7 @@ Let `R = RISCVAIoT/MyTinyMobileNetSoC/fpga/zcu106/reports/`.
 | `20261011_231608_8_8p8125ns/` | `status.txt`, `metadata.txt`, copied `evaluation.xdc` | Failed at synthesis-stage period assertion: clock period disagrees with metadata. No timing verdict; not a timing failure measurement and not an intermediate Fmax bound. |
 
 Both completed runs' `rtl_manifest.txt` entries were checked using
-`git hash-object RISCVAIoT/MyTinyMobileNetSoC/<filename>` in this pass. All eight
+`git hash-object MyTinyMobileNetSoC/<filename>` in this pass. All eight
 entries match current source in both runs:
 
 | RTL file | Matching Git blob ID |

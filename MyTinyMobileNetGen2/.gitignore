@@ -1,0 +1,17 @@
+# Local environments and generated build artifacts
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.o
+*.elf
+*.hex
+*.vvp
+*.vcd
+build/
+.Xil/
+*.jou
+*.log
+# Generated model files remain local until deliberately selected for versioning.
+/model/generated/*
+!/model/generated/.gitkeep

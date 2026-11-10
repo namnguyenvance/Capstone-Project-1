@@ -14,7 +14,7 @@ Use a fresh batch process; do not source this script into a populated project.
 Recommended command-prompt sequence, starting in this directory:
 
 ```bat
-cd /d C:\path\to\Capstone-Project-1-work\RISCVAIoT\MyTinyMobileNetSoC\fpga\zcu106
+cd /d C:\path\to\Capstone-Project-1-work\MyTinyMobileNetSoC\fpga\zcu106
 if not exist build mkdir build
 cd build
 vivado -mode batch -source ..\run_vivado.tcl -log vivado.log -journal vivado.jou

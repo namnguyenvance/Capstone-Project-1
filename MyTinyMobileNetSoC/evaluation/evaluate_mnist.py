@@ -233,7 +233,7 @@ def main():
     parser.add_argument("--cc", default="cc")
     args = parser.parse_args()
     out = args.output_dir.resolve()
-    repository = ROOT.parents[1]
+    repository = ROOT.parent
     if out == repository or repository in out.parents:
         parser.error("Use an output directory outside the repository")
     out.mkdir(parents=True, exist_ok=True)
