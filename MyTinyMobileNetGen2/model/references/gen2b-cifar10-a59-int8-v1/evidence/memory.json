@@ -1,0 +1,17 @@
+{
+  "weights_bytes": 7056,
+  "bias_bytes": 1064,
+  "multiplier_shift_bytes": 2136,
+  "input_bytes": 3072,
+  "two_fixed_activation_buffers_bytes": 65536,
+  "gap_and_logits_bytes": 74,
+  "max_adjacent_activation_bytes": 49152,
+  "firmware_code_bytes": null,
+  "stack_bytes": null,
+  "note": "Payload counts only; descriptors, code and stack must be measured in later firmware.",
+  "model_payload_bytes": 10256,
+  "numeric_payload_plus_buffers_bytes": 78938,
+  "remaining_of_256KiB_bytes": 183206,
+  "tflite_file_bytes": 19824,
+  "complete_firmware_fit": "pending code/stack/descriptors"
+}

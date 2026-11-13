@@ -1,0 +1,78 @@
+{
+  "elapsed_seconds": 2.0642907709999463,
+  "sample_selection": "first N CIFAR-10 test images in dataset order",
+  "count": 100,
+  "native_accuracy": 0.62,
+  "tflite_accuracy": 0.62,
+  "prediction_agreement": 1.0,
+  "exact_logits_images": 100,
+  "stages": [
+    {
+      "operator": "CONV_2D",
+      "tensor": 18,
+      "equal_elements": 1638400,
+      "elements": 1638400,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "tensor": 19,
+      "equal_elements": 1638400,
+      "elements": 1638400,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "CONV_2D",
+      "tensor": 20,
+      "equal_elements": 3276800,
+      "elements": 3276800,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "tensor": 21,
+      "equal_elements": 819200,
+      "elements": 819200,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "CONV_2D",
+      "tensor": 22,
+      "equal_elements": 1228800,
+      "elements": 1228800,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "tensor": 23,
+      "equal_elements": 307200,
+      "elements": 307200,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "CONV_2D",
+      "tensor": 24,
+      "equal_elements": 409600,
+      "elements": 409600,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "MEAN",
+      "tensor": 25,
+      "equal_elements": 6400,
+      "elements": 6400,
+      "max_abs_difference": 0
+    },
+    {
+      "operator": "FULLY_CONNECTED",
+      "tensor": 26,
+      "equal_elements": 1000,
+      "elements": 1000,
+      "max_abs_difference": 0
+    }
+  ],
+  "model_sha256": "8779ca06e9dbf5611ccef247bd6b55eca6127ff0fbeea7ec67b94ac72c20a6c1",
+  "reference_resolver": "BUILTIN_REF",
+  "rtl_equivalence": "not tested; Gen 2 RTL absent",
+  "optimization_equivalence": "not tested; no optimized Gen 2 implementation"
+}

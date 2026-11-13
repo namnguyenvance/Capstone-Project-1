@@ -1,0 +1,45 @@
+{
+  "status": "PASS",
+  "version_id": "gen2b-cifar10-a59-int8-v1",
+  "manifest_sha256": "7378a63f5d7b1f16d4e8060ea843605bbf27db498729c2631075fa3ee99f8b93",
+  "mode": "both",
+  "count": 10000,
+  "native_correct": 6130,
+  "native_accuracy": 0.613,
+  "golden_logits_exact": 10000,
+  "golden_first100_all_layers_exact": true,
+  "conv0_arithmetic_stages_exact": true,
+  "full_layer_stream_digests_exact": true,
+  "native_tflite_prediction_agreement": 1.0,
+  "native_tflite_equal_elements": [
+    163840000,
+    163840000,
+    327680000,
+    81920000,
+    122880000,
+    30720000,
+    40960000,
+    640000,
+    100000
+  ],
+  "maximum_absolute_differences": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "layer_elements_processed": 932580000,
+  "unit_tests": 5,
+  "reexport_exact": true,
+  "elapsed_seconds": 82.13066101799996,
+  "versions": {
+    "tensorflow": "2.18.1",
+    "numpy": "2.0.2"
+  },
+  "rtl_equivalence": "not claimed"
+}

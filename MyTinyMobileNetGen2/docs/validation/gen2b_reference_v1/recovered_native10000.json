@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "version_id": "gen2b-cifar10-a59-int8-v1",
+  "manifest_sha256": "7378a63f5d7b1f16d4e8060ea843605bbf27db498729c2631075fa3ee99f8b93",
+  "mode": "native",
+  "count": 10000,
+  "native_correct": 6130,
+  "native_accuracy": 0.613,
+  "golden_logits_exact": 10000,
+  "golden_first100_all_layers_exact": true,
+  "conv0_arithmetic_stages_exact": true,
+  "full_layer_stream_digests_exact": true,
+  "native_tflite_prediction_agreement": null,
+  "native_tflite_equal_elements": null,
+  "maximum_absolute_differences": null,
+  "layer_elements_processed": 932580000,
+  "unit_tests": 5,
+  "reexport_exact": false,
+  "elapsed_seconds": 54.21633143899999,
+  "versions": {},
+  "rtl_equivalence": "not claimed"
+}

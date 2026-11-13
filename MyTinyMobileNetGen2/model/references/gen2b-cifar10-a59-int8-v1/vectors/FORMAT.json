@@ -1,0 +1,131 @@
+{
+  "source": "TensorFlow 2.18.1 BUILTIN_REF, no delegates",
+  "layout": "CHW for 3D activations; natural vector order for GAP/FC; sample-major",
+  "layers": [
+    {
+      "operator": "CONV_2D",
+      "order": 0,
+      "shape": [
+        32,
+        32,
+        16
+      ],
+      "path": "vectors/layer00.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 163840000,
+      "full_sha256": "ba688f6c2efd8e4a95a8b249c8eb7c16318175c4d9d19ff1dcce3b0a3eb0f0e4"
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "order": 1,
+      "shape": [
+        32,
+        32,
+        16
+      ],
+      "path": "vectors/layer01.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 163840000,
+      "full_sha256": "84b402c10acdce0d316e93a66badcca87ce95be89577fd4200486c8388a53f29"
+    },
+    {
+      "operator": "CONV_2D",
+      "order": 2,
+      "shape": [
+        32,
+        32,
+        32
+      ],
+      "path": "vectors/layer02.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 327680000,
+      "full_sha256": "8a485ef0a0651891568e34ff66dbfd48f51d6ca03cbac46058c3f6d53c2a8e70"
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "order": 3,
+      "shape": [
+        16,
+        16,
+        32
+      ],
+      "path": "vectors/layer03.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 81920000,
+      "full_sha256": "5f14a2630df0b152da67ad2ccc7c24faec39c7a4bb2d2c09b087ef8cde2e4d39"
+    },
+    {
+      "operator": "CONV_2D",
+      "order": 4,
+      "shape": [
+        16,
+        16,
+        48
+      ],
+      "path": "vectors/layer04.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 122880000,
+      "full_sha256": "fa5c4dab00a964ac0b0b42ebd90505e5b11b7a0dacc0943ea475b72a4f7a80c8"
+    },
+    {
+      "operator": "DEPTHWISE_CONV_2D",
+      "order": 5,
+      "shape": [
+        8,
+        8,
+        48
+      ],
+      "path": "vectors/layer05.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 30720000,
+      "full_sha256": "7417c56af2138c89b4bc00f93e9dedab730aebd1820f0f4681868c035b3128bf"
+    },
+    {
+      "operator": "CONV_2D",
+      "order": 6,
+      "shape": [
+        8,
+        8,
+        64
+      ],
+      "path": "vectors/layer06.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 40960000,
+      "full_sha256": "d62f572dc8bc47c05bd3a19380366d8f55ca0dc98475ddb6d202610506ba2513"
+    },
+    {
+      "operator": "MEAN",
+      "order": 7,
+      "shape": [
+        64
+      ],
+      "path": "vectors/layer07.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 640000,
+      "full_sha256": "013daf2aded02e76a07e73719993553c564f47f30ca630cacddab79d17f4e770"
+    },
+    {
+      "operator": "FULLY_CONNECTED",
+      "order": 8,
+      "shape": [
+        10
+      ],
+      "path": "vectors/layer08.first100.chw.i8.gz",
+      "count": 100,
+      "full_count": 10000,
+      "full_bytes": 100000,
+      "full_sha256": "ea007bf5b4a5f9c1d0508c696ee5fbddbd549bca04e5cc48c0c28156284a40eb"
+    }
+  ],
+  "full_logits_path": "vectors/logits10000.i8.gz",
+  "test_correct": 6130,
+  "meaning": "First 100 layer tensors are stored in full; every full-test layer stream has a SHA-256 digest."
+}

@@ -1,0 +1,7 @@
+{
+  "python": "3.14.4 (main, Aug 20 2026, 10:41:58) [GCC 15.2.0]",
+  "cc": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "fresh_checkout_method": "temporary Git repository, add/index then checkout-index with core.autocrlf=true; no commit or push",
+  "fresh_checkout_path": "/tmp/gen2b-git-checkout-v1/checkout",
+  "gpu": "unavailable; optional TensorFlow checks used CPU"
+}

@@ -1,0 +1,12 @@
+{
+  "count": 10000,
+  "float_accuracy": 0.6172000169754028,
+  "float_loss": 1.0765875577926636,
+  "int8_accuracy": 0.613,
+  "float_minus_int8_percentage_points": 0.42000169754028427,
+  "elapsed_seconds": 31.69874971200005,
+  "float_sha256": "bf561ec4d030d898d62c7630ca1816eb34cab64217ed7953aa86c1dff776ab6e",
+  "tflite_sha256": "8779ca06e9dbf5611ccef247bd6b55eca6127ff0fbeea7ec67b94ac72c20a6c1",
+  "resolver": "BUILTIN_REF",
+  "input_rounding": "nearest ties to even, saturate int8"
+}

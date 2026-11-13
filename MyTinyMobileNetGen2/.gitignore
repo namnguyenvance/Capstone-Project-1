@@ -15,3 +15,5 @@ build/
 # Generated model files remain local until deliberately selected for versioning.
 /model/generated/*
 !/model/generated/.gitkeep
+# Independent training experiments; never overwrite verified baseline outputs.
+/model/experiments/

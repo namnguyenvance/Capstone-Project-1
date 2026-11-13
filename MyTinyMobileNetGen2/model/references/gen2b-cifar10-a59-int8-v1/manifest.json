@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "version_id": "gen2b-cifar10-a59-int8-v1",
+  "selected_epoch": 59,
+  "source_model_sha256": "bf561ec4d030d898d62c7630ca1816eb34cab64217ed7953aa86c1dff776ab6e",
+  "tflite_sha256": "8779ca06e9dbf5611ccef247bd6b55eca6127ff0fbeea7ec67b94ac72c20a6c1",
+  "float_accuracy": 0.6172,
+  "int8_accuracy": 0.613,
+  "parameter_count": 7322,
+  "macs_per_image": 1805952,
+  "immutable_policy": "Never edit this directory after promotion; create a new version and update active.json for any change.",
+  "scope": "Software golden reference; RTL/timing/complete firmware memory not verified",
+  "artifacts": {
+    "CONTRACT.md": {
+      "bytes": 5315,
+      "sha256": "580c7b9e3d85ac38ba1503e7183604dfcf77df6a7857c79f0a45896baa367aa4"
+    },
+    "dataset/FORMAT.json": {
+      "bytes": 3056,
+      "sha256": "3f39cc268be244e228136d028b7a9866cf57e3d77c151af2fa4e511df3f4b9f8"
+    },
+    "dataset/calibration.nhwc.u8.gz": {
+      "bytes": 1410048,
+      "sha256": "280bfac4e7dd59778930434dfb806cf0dc375bcc9d98374051f276b6d1bcc04c"
+    },
+    "dataset/labels.u8": {
+      "bytes": 10000,
+      "sha256": "cec8a24a1e92aa2ecaa0bbd3dbfa86bf6cd8759fbd209a832824c8cf0afca9d5"
+    },
+    "dataset/test_00000_00999.chw.i8.gz": {
+      "bytes": 2824389,
+      "sha256": "669219d0b720e03c71622e23bb2c4aae972ec2b16ef555f04e9904d531eb7ccf"
+    },
+    "dataset/test_01000_01999.chw.i8.gz": {
+      "bytes": 2827599,
+      "sha256": "97882bab867cbebcab0310b95bd3c841d0c398135fcf366d377b05d8c3deef0f"
+    },
+    "dataset/test_02000_02999.chw.i8.gz": {
+      "bytes": 2820973,
+      "sha256": "7dad8ec5b94df165c66c7a36270187c16ed848fcc4b1a991e20af282385b385f"
+    },
+    "dataset/test_03000_03999.chw.i8.gz": {
+      "bytes": 2823358,
+      "sha256": "792011c98513e1010a4a893c1029bb69e9586217f4e5cbe13c28f24816cb5338"
+    },
+    "dataset/test_04000_04999.chw.i8.gz": {
+      "bytes": 2826970,
+      "sha256": "7fb40cb627a6ec4a62df65052563253bdcb2ca97b62d22fe9612c31c7fe5c4f0"
+    },
+    "dataset/test_05000_05999.chw.i8.gz": {
+      "bytes": 2821867,
+      "sha256": "a196f33e6d3dccb35e2413340437d33ce58a1a254ea826d5c944d1103112ee76"
+    },
+    "dataset/test_06000_06999.chw.i8.gz": {
+      "bytes": 2820971,
+      "sha256": "bcf63bac8ebd68faceca823b49ae18f6fe5c45fb591debbdb86e03702b3333bf"
+    },
+    "dataset/test_07000_07999.chw.i8.gz": {
+      "bytes": 2829245,
+      "sha256": "6b28f0abb4cfa4b294fa883388aae58d1be93c16d6e4043ecc011ff69a2e11c5"
+    },
+    "dataset/test_08000_08999.chw.i8.gz": {
+      "bytes": 2823674,
+      "sha256": "3f35cc7c6b0da8ccc6b147d3d3e1b148dc83427f5b464b9b02a01b4aedc9f731"
+    },
+    "dataset/test_09000_09999.chw.i8.gz": {
+      "bytes": 2820450,
+      "sha256": "84364685eff7bae665e2e4945a6df200b7733723e0e2da6710fdcb338e029ea9"
+    },
+    "evidence/calibration.json": {
+      "bytes": 5767,
+      "sha256": "03d18e33a8b1b8fce5fc870f3b0fd0e1e17b069b2180cf03e6b0d97c46c14d1b"
+    },
+    "evidence/environment.txt": {
+      "bytes": 906,
+      "sha256": "bd00c0ac1933a8a0d78966bd7d09e28e9b669faf5a7e59250cb6349dc48d1f03"
+    },
+    "evidence/evaluation.json": {
+      "bytes": 485,
+      "sha256": "7b83a55c4826b01c683bf13059170d5d6f65bacdcb69b69df266f9bff30d8240"
+    },
+    "evidence/final_output_hashes.json": {
+      "bytes": 1992,
+      "sha256": "31b5c59c0b37cf084abba68d1224963ca48d030d443b1b7834b5b65581280aff"
+    },
+    "evidence/memory.json": {
+      "bytes": 587,
+      "sha256": "97fa3174f56f3759944ce7b9b8acb448b9f4baeded9ca3a977ffffc61f138cc7"
+    },
+    "evidence/metadata.json": {
+      "bytes": 1057,
+      "sha256": "7ba594275220e476f9f6c868d2c952e778dfa1323eea760a6890db569b30c7ff"
+    },
+    "evidence/native_verification_100.json": {
+      "bytes": 1906,
+      "sha256": "f97be4a2015d48f38e6ca95b05df88cfb76b8d2bc12f5a2e28a1d41c1b21d75e"
+    },
+    "evidence/native_verification_10000.json": {
+      "bytes": 1948,
+      "sha256": "d6adf8324406b047c4dec71f915a1c171e7bfc00b9791c467dcbc9f8a399f6c4"
+    },
+    "evidence/protected_integrity.json": {
+      "bytes": 67,
+      "sha256": "d5dc48174e78ec775bebe4e960535a24ea6d47c5fccf17bde9ea36fdd704acda"
+    },
+    "evidence/result.json": {
+      "bytes": 253,
+      "sha256": "94ad20bb22609cff0338452f523c2a4ee79a3cd984eb5b94d8dd7404a9d30220"
+    },
+    "evidence/unit_tests.json": {
+      "bytes": 35,
+      "sha256": "f762b823f2b87a52c06589937a6e0fd0835399148fb925bf7a72a677df091f2c"
+    },
+    "model/export.json": {
+      "bytes": 163527,
+      "sha256": "dafcd5fb7cd7cc167d9ace89cba8419eb7f0c58d4172917cfdbfe35c2818c40c"
+    },
+    "model/float.keras": {
+      "bytes": 162904,
+      "sha256": "bf561ec4d030d898d62c7630ca1816eb34cab64217ed7953aa86c1dff776ab6e"
+    },
+    "model/int8.tflite": {
+      "bytes": 19824,
+      "sha256": "8779ca06e9dbf5611ccef247bd6b55eca6127ff0fbeea7ec67b94ac72c20a6c1"
+    },
+    "model/model_data.c": {
+      "bytes": 29577,
+      "sha256": "e58f06afbb1a3b6b7b8554cfd98f417647b4dce027dda95b72efa89b6a4569c1"
+    },
+    "model/model_data.h": {
+      "bytes": 1234,
+      "sha256": "b602b06ce21b24cb1b31145c92a9d726b83c87f583d4cf56e28d506f9b53a535"
+    },
+    "requirements.txt": {
+      "bytes": 63,
+      "sha256": "53f8be0653c5d70daa06b0b03b6bdf190f84e75e829b7973bda9d323afd91436"
+    },
+    "tools/export.py": {
+      "bytes": 8948,
+      "sha256": "f3c5bf3a2680f6caa1235865f306ffc90f9850b160d0721056935fd4ba56023f"
+    },
+    "tools/kernels.c": {
+      "bytes": 3431,
+      "sha256": "dca22d676902c69f01957fe178bf2f53a803b42492c106c0cf7d256f9fcd3631"
+    },
+    "tools/network.py": {
+      "bytes": 1377,
+      "sha256": "f3efeadb2427890e28da840ecdebcbeeef62fdcd54880e3db9d431f1de15076d"
+    },
+    "tools/reference_engine.py": {
+      "bytes": 9323,
+      "sha256": "08c8ac377b91bd332f78515216d655639ac94bd5b9a10170446f14d63ce61f49"
+    },
+    "tools/test_rgb.py": {
+      "bytes": 5554,
+      "sha256": "145bbab8f0d8f89c048b058dca868c365825451891e954b3a9ed1a7bd835b635"
+    },
+    "vectors/FORMAT.json": {
+      "bytes": 3376,
+      "sha256": "4ba86684301a8f2db5395cb8f4ec79e9abf3ce68257a66f91d5caeb5134746d8"
+    },
+    "vectors/conv0_image0.biased.le_i32.gz": {
+      "bytes": 45595,
+      "sha256": "5071b988bd59e3bd309771b884ac6710aa86cf07a3b735d20733fc945ae16a41"
+    },
+    "vectors/conv0_image0.raw.le_i32.gz": {
+      "bytes": 45653,
+      "sha256": "7ed47c18b88187d3ca45fe5c14de97eb8c0cf56751e2a0ed28d1c1b6660495fd"
+    },
+    "vectors/conv0_image0.requant.le_i32.gz": {
+      "bytes": 15696,
+      "sha256": "f1e54eca924bc9a659a754d08721e96c3f8819f9664b6750811641d481e01269"
+    },
+    "vectors/layer00.first100.chw.i8.gz": {
+      "bytes": 624262,
+      "sha256": "24453a81e2f8d9b676b88810507bd55f836f9e395a62e2f87ec1d1ad2fcb38c5"
+    },
+    "vectors/layer01.first100.chw.i8.gz": {
+      "bytes": 571622,
+      "sha256": "a0c42c3509b987d878332202e2d642bc5255443f3f0c662d8b4296085ad8bc4a"
+    },
+    "vectors/layer02.first100.chw.i8.gz": {
+      "bytes": 1853750,
+      "sha256": "fe3a285380dbcaf650d374c68d01b30b5d57bb449b9902c091a24a96c61ba5d5"
+    },
+    "vectors/layer03.first100.chw.i8.gz": {
+      "bytes": 492094,
+      "sha256": "3f6904949811cacf35c96e807c746aac15661a736524a8bf9d5e9bc8c653c485"
+    },
+    "vectors/layer04.first100.chw.i8.gz": {
+      "bytes": 707941,
+      "sha256": "06c8ebfa0fb2e282eeca31cba509cd2efda13c20a4f6b40eb540a5f4ba6394aa"
+    },
+    "vectors/layer05.first100.chw.i8.gz": {
+      "bytes": 165991,
+      "sha256": "645eabadf65d243f9eae3850f80be07fb7765c52acc29feb8e762296b3db19ce"
+    },
+    "vectors/layer06.first100.chw.i8.gz": {
+      "bytes": 242049,
+      "sha256": "8d7b7db95ea68208c71ee57096c50019d6196551a8562e51380a388b0498750d"
+    },
+    "vectors/layer07.first100.chw.i8.gz": {
+      "bytes": 5854,
+      "sha256": "3255fba4126a83c1c653f46e83e488877e20dc4bad49ff2b4722d0d838232ba8"
+    },
+    "vectors/layer08.first100.chw.i8.gz": {
+      "bytes": 988,
+      "sha256": "b89a6c5e38b1f6b861f4cf4fc5a18eeaf7fd09e2e0b5605c02d8b039c8841b0d"
+    },
+    "vectors/logits10000.i8.gz": {
+      "bytes": 91409,
+      "sha256": "87f6b6b4b3a8a5cd4d244c2fd31ff91a6b33e7a245c4126bde77599c18045695"
+    }
+  }
+}

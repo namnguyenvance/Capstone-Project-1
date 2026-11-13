@@ -1,0 +1,105 @@
+{
+  "test_count": 10000,
+  "test_input_shape": [
+    3,
+    32,
+    32
+  ],
+  "test_dtype": "int8",
+  "test_order": "CIFAR-10 original test order",
+  "shards": [
+    {
+      "path": "dataset/test_00000_00999.chw.i8.gz",
+      "first_index": 0,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "0f275687e35b5ae47321b9f3bb74ba8b1c6c7fba1ce9a550bf0aac1fa769367c"
+    },
+    {
+      "path": "dataset/test_01000_01999.chw.i8.gz",
+      "first_index": 1000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "72f2cb1a9e01e191dc643ca002453a46562e5407263d085d07c5c5fb3a02f115"
+    },
+    {
+      "path": "dataset/test_02000_02999.chw.i8.gz",
+      "first_index": 2000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "129510f25d8be74b2c9af87535d72bf379709f5a83ad67786606badb3add8258"
+    },
+    {
+      "path": "dataset/test_03000_03999.chw.i8.gz",
+      "first_index": 3000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "833dce2859c80ad9e94e629e9d2a0c94704b7455efc98eefb58f62b2795c403e"
+    },
+    {
+      "path": "dataset/test_04000_04999.chw.i8.gz",
+      "first_index": 4000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "b7a6f93ba3d7a448c24d4f7013d9d52f1f88c16634384c6fd37eca14a08f17bd"
+    },
+    {
+      "path": "dataset/test_05000_05999.chw.i8.gz",
+      "first_index": 5000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "3d5ff8cfa083a13186f38daa1da4d545f10946f50f4672fab66460d07e8b1498"
+    },
+    {
+      "path": "dataset/test_06000_06999.chw.i8.gz",
+      "first_index": 6000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "62a4658cc9e4214bbca4957682a62b7562994b541d1eeb362f5d4ca18bee9db4"
+    },
+    {
+      "path": "dataset/test_07000_07999.chw.i8.gz",
+      "first_index": 7000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "c8924a2d3fd0f406e4d76a472c50941ba237f6580390eb295fc75a9268d98c6a"
+    },
+    {
+      "path": "dataset/test_08000_08999.chw.i8.gz",
+      "first_index": 8000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "2f52a03ae9d24e8862c79b0d9c590c58103d82e46b6463caab87d8662c81f8c9"
+    },
+    {
+      "path": "dataset/test_09000_09999.chw.i8.gz",
+      "first_index": 9000,
+      "count": 1000,
+      "decoded_bytes": 3072000,
+      "decoded_sha256": "356b20e5ac38bd40f6901588b7ddb2e774729fa183ee062df72fb9c5ccb41d60"
+    }
+  ],
+  "labels": "dataset/labels.u8",
+  "calibration_shape": [
+    500,
+    32,
+    32,
+    3
+  ],
+  "calibration_dtype": "uint8",
+  "source": "https://www.cs.toronto.edu/~kriz/cifar.html",
+  "class_names": [
+    "airplane",
+    "automobile",
+    "bird",
+    "cat",
+    "deer",
+    "dog",
+    "frog",
+    "horse",
+    "ship",
+    "truck"
+  ],
+  "preprocessing": "RGB uint8 / 255; nearest ties-to-even quantization with INT8 saturation",
+  "test_recovery": "NHWC uint8 recovered by CHW->HWC then xor 128 for this input scale/zero point"
+}

@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "selected_epoch": 59,
+  "unsupported_operators": [],
+  "float_accuracy": 0.6172000169754028,
+  "int8_accuracy": 0.613,
+  "elapsed_seconds": 204.19370564099995,
+  "promotion": "recommendation only; original reference unchanged"
+}

@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "count": 5,
+  "checks": [
+    "valid bundle",
+    "wrong manifest pin rejected",
+    "corrupt export rejected",
+    "missing golden vector rejected",
+    "unlisted file rejected"
+  ]
+}

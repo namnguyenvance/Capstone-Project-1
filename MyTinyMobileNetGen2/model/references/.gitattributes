@@ -1,0 +1,3 @@
+# Preserve byte-exact manifests and artifact hashes across Git checkouts.
+gen2b-cifar10-a59-int8-v1/** -text -filter
+active.json -text -filter
